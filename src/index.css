@@ -19,6 +19,8 @@ body {
   background-color: var(--term-bg);
   color: var(--term-fg);
   font-family: 'TX02', monospace;
+  font-size: 0.9rem;
+  font-weight: normal;
 }
 
 #root {
@@ -39,6 +41,8 @@ h1 {
   padding-bottom: 10px;
   margin-top: 0;
   text-transform: uppercase;
+  font-size: inherit;
+  font-weight: normal;
 }
 
 .subtitle {
@@ -60,23 +64,38 @@ h1 {
 
 .input-group label {
   flex: 0 0 160px;
-  font-size: 1.2rem;
 }
 
-.input-group input {
+.input-group input, .input-group select {
   flex: 1;
   background-color: transparent;
   border: 1px solid var(--term-border);
   color: var(--term-fg);
   font-family: inherit;
-  font-size: 1.2rem;
+  font-size: inherit;
   padding: 4px;
   outline: none;
+  min-width: 0;
 }
 
 .input-group input:focus {
   background-color: var(--term-fg);
   color: var(--term-bg);
+}
+
+.grid-inputs {
+  display: flex;
+  flex: 1;
+  gap: 15px;
+  min-width: 0;
+}
+
+.grid-input-wrapper {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 
 .results-section {
@@ -89,7 +108,6 @@ h1 {
   display: flex;
   justify-content: space-between;
   margin-bottom: 10px;
-  font-size: 1.2rem;
 }
 
 .result-row:last-child {
@@ -102,7 +120,6 @@ h1 {
   text-align: center;
   padding: 5px;
   margin-top: 5px;
-  font-weight: bold;
 }
 
 button {
@@ -110,13 +127,13 @@ button {
   color: var(--term-fg);
   border: 2px solid var(--term-border);
   font-family: inherit;
-  font-size: 1.5rem;
+  font-size: inherit;
+  font-weight: normal;
   padding: 10px;
   cursor: pointer;
   text-transform: uppercase;
   width: 100%;
   margin-top: 15px;
-  font-weight: bold;
 }
 
 button:hover {
@@ -134,9 +151,7 @@ button:active {
   color: var(--term-bg);
   animation: blinker 0.2s linear infinite;
   text-align: center;
-  font-weight: bold;
   padding: 10px;
-  font-size: 1.5rem;
   margin-top: 15px;
   border: 2px solid var(--term-fg);
 }
@@ -173,4 +188,51 @@ button:active {
 
 .table-reference th {
   text-align: center;
+}
+
+/* Responsiveness for Mobile/Tablets */
+@media screen and (max-width: 600px) {
+  body {
+    font-size: 0.75rem;
+  }
+
+  #root {
+    padding: 10px;
+  }
+  
+  .terminal-container {
+    padding: 10px;
+  }
+
+  .input-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .input-group label {
+    flex: none;
+    margin-bottom: 2px;
+  }
+
+  .input-group input, .input-group select {
+    padding: 6px;
+  }
+
+  .grid-inputs {
+    flex-direction: row;
+    width: 100%;
+    gap: 10px;
+  }
+
+  button {
+    padding: 12px;
+  }
+}
+
+@media screen and (max-width: 400px) {
+  .grid-inputs {
+    flex-direction: column;
+  }
 }

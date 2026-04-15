@@ -7,6 +7,7 @@ const CHARGES = [
     id: 1,
     min: 950,
     max: 1500,
+    dispersion: 69,
     data: [
         { range: 950, elev: 1245, tof: 24.4 },
         { range: 1000, elev: 1221, tof: 24.2 },
@@ -26,6 +27,7 @@ const CHARGES = [
     id: 2,
     min: 1500,
     max: 2500,
+    dispersion: 85,
     data: [
         { range: 1500, elev: 1270, tof: 33.1 },
         { range: 1550, elev: 1257, tof: 33.0 },
@@ -54,6 +56,7 @@ const CHARGES = [
     id: 3,
     min: 2100,
     max: 3600,
+    dispersion: 110,
     data: [
         { range: 2100, elev: 1272, tof: 41.0 },
         { range: 2200, elev: 1253, tof: 40.8 },
@@ -77,6 +80,7 @@ const CHARGES = [
     id: 4,
     min: 2600,
     max: 4500,
+    dispersion: 135,
     data: [
         { range: 2600, elev: 1271, tof: 47.2 },
         { range: 2700, elev: 1255, tof: 47.0 },
@@ -104,6 +108,7 @@ const CHARGES = [
     id: 5,
     min: 3000,
     max: 5300,
+    dispersion: 160,
     data: [
         { range: 3000, elev: 1271, tof: 52.2 },
         { range: 3100, elev: 1258, tof: 52.0 },
@@ -133,39 +138,34 @@ const CHARGES = [
   }
 ];
 
-function interpolate(x: number, x0: number, x1: number, y0: number, y1: number) {
-  return y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
+function parseGridPiece(p: string) {
+  if (!p || p.trim() === '') return null;
+  const clean = p.replace(/[^0-9]/g, '');
+  if (clean.length === 0) return null;
+
+  // 3-digit MGRS block (100m precision) -> e.g. "048" means 4800m
+  if (clean.length === 3) return parseInt(clean, 10) * 100;
+  // 1 or 2 digit MGRS block (1km precision) -> e.g. "04" means 4000m
+  if (clean.length <= 2) return parseInt(clean, 10) * 1000;
+  // >= 4 digits: treat as absolute exact meters from drone output
+  return parseInt(clean, 10);
 }
 
-function parseGrid(grid: string) {
-  const clean = grid.replace(/[^0-9]/g, '');
-  if (clean.length === 6) {
-    return {
-      x: parseInt(clean.substring(0, 3), 10) * 100,
-      y: parseInt(clean.substring(3, 6), 10) * 100
-    };
-  } else if (clean.length === 8) {
-    return {
-      x: parseInt(clean.substring(0, 4), 10) * 10,
-      y: parseInt(clean.substring(4, 8), 10) * 10
-    };
-  } else if (clean.length === 10) {
-    return {
-      x: parseInt(clean.substring(0, 5), 10),
-      y: parseInt(clean.substring(5, 10), 10)
-    };
-  }
-  return null;
-}
-
-function calculateAzimuthAndRange(gunGrid: string, targetGrid: string) {
-  const gun = parseGrid(gunGrid);
-  const target = parseGrid(targetGrid);
+function calculateAzimuthAndRange(gx: string, gy: string, tx: string, ty: string, an: string, as: string, ae: string, aw: string) {
+  const g_x = parseGridPiece(gx);
+  const g_y = parseGridPiece(gy);
+  let t_x = parseGridPiece(tx);
+  let t_y = parseGridPiece(ty);
   
-  if (!gun || !target) return null;
+  if (g_x === null || g_y === null || t_x === null || t_y === null) return null;
 
-  const dx = target.x - gun.x;
-  const dy = target.y - gun.y;
+  t_x += parseFloat(ae || '0');
+  t_x -= parseFloat(aw || '0');
+  t_y += parseFloat(an || '0');
+  t_y -= parseFloat(as || '0');
+
+  const dx = t_x - g_x;
+  const dy = t_y - g_y;
 
   const dist = Math.sqrt(dx * dx + dy * dy);
   
@@ -176,10 +176,22 @@ function calculateAzimuthAndRange(gunGrid: string, targetGrid: string) {
   return { range: Math.round(dist), azimuth: azMil };
 }
 
+function interpolate(x: number, x0: number, x1: number, y0: number, y1: number) {
+  if (x0 === x1) return y0;
+  return y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
+}
+
 function App() {
-  const [gunGrid, setGunGrid] = useState<string>('');
-  const [targetGrid, setTargetGrid] = useState<string>('');
-  const [elevDeltaStr, setElevDeltaStr] = useState<string>('0');
+  const [gunX, setGunX] = useState<string>('');
+  const [gunY, setGunY] = useState<string>('');
+  const [tgtX, setTgtX] = useState<string>('');
+  const [tgtY, setTgtY] = useState<string>('');
+  const [adjN, setAdjN] = useState<string>('');
+  const [adjS, setAdjS] = useState<string>('');
+  const [adjE, setAdjE] = useState<string>('');
+  const [adjW, setAdjW] = useState<string>('');
+  const [gunElevStr, setGunElevStr] = useState<string>('0');
+  const [tgtElevStr, setTgtElevStr] = useState<string>('0');
   const [forcedCharge, setForcedCharge] = useState<number | null>(null);
   
   const [fireStart, setFireStart] = useState<number | null>(null);
@@ -193,19 +205,20 @@ function App() {
     return () => clearInterval(interval);
   }, [fireStart]);
 
-  const gridData = useMemo(() => calculateAzimuthAndRange(gunGrid, targetGrid), [gunGrid, targetGrid]);
+  const gridData = useMemo(() => calculateAzimuthAndRange(gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW), [gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW]);
 
   const activeRange = gridData ? gridData.range.toString() : '';
 
   const calculation = useMemo(() => {
-    if (!activeRange) return { valid: false, message: 'WAITING FOR DATA...' };
+    try {
+        if (!activeRange) return { valid: false, message: 'WAITING FOR DATA...' };
 
-    const r = parseFloat(activeRange);
-    
-    if (isNaN(r)) return { valid: false, message: 'INVALID RANGE' };
-    
-    // Find viable charge
-    let activeCharge = null;
+        const r = parseFloat(activeRange);
+        
+        if (isNaN(r)) return { valid: false, message: 'INVALID RANGE' };
+        
+        // Find viable charge
+        let activeCharge = null;
     
     if (forcedCharge !== null) {
         activeCharge = CHARGES.find(c => c.id === forcedCharge);
@@ -248,19 +261,58 @@ function App() {
         tof = interpolate(r, lower.range, upper.range, lower.tof, upper.tof);
     }
 
-    const elevDelta = parseFloat(elevDeltaStr);
+    const gunElevAlt = parseFloat(gunElevStr);
+    const tgtElevAlt = parseFloat(tgtElevStr);
+    let deltaH = 0;
+    if (!isNaN(gunElevAlt) && !isNaN(tgtElevAlt)) {
+        deltaH = tgtElevAlt - gunElevAlt;
+    }
+
     let angleFix = 0;
-    if (!isNaN(elevDelta) && elevDelta !== 0) {
-        angleFix = Math.atan2(elevDelta, r) * (6400 / (2 * Math.PI));
+    let tofFix = 0;
+    
+    if (deltaH !== 0 && activeCharge.data.length > 1) {
+        // Derive local slope to calculate accurate high-angle parallax correction
+        let idx = lowerIndex;
+        if (idx >= activeCharge.data.length - 1) {
+            idx = activeCharge.data.length - 2;
+        }
+        
+        const currentData = activeCharge.data[idx];
+        const nextData = activeCharge.data[idx + 1];
+        
+        const dRange = nextData.range - currentData.range;
+        const dElev_dRange = (nextData.elev - currentData.elev) / dRange;
+        const dTof_dRange = (nextData.tof - currentData.tof) / dRange;
+        
+        // M777 High Angle: 100m height diff corresponds perfectly to 50m horizontal range diff (2:1 slope at impact).
+        // effective step = deltaH * 0.5
+        angleFix = -dElev_dRange * (deltaH * 0.5);
+        tofFix = -dTof_dRange * (deltaH * 0.5);
+    }
+    
+    const finalElev = Math.round(baseElev - angleFix);
+    const finalTof = Math.round((tof - tofFix) * 10) / 10;
+
+    if (finalElev < 0 || finalElev > 1300) {
+        return { valid: false, message: 'SOLUTION IMPOSSIBLE (TRAVERSAL LIMIT)' };
+    }
+    
+    if (finalTof <= 0) {
+        return { valid: false, message: 'SOLUTION IMPOSSIBLE (COLLISION/TOF)' };
     }
 
     return {
         valid: true,
         charge: activeCharge.id,
-        elev: Math.round(baseElev - angleFix),
-        tof: Math.round(tof * 10) / 10
+        dispersion: activeCharge.dispersion,
+        elev: finalElev,
+        tof: finalTof
     };
-  }, [activeRange, elevDeltaStr, forcedCharge]);
+    } catch (err: any) {
+        return { valid: false, message: `CRASH: ${err.message}` };
+    }
+  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge]);
 
   const azMilStr = gridData ? gridData.azimuth.toString().padStart(4, '0') : '----';
   const azDegStr = gridData ? (gridData.azimuth * (360 / 6400)).toFixed(1) : '--.-';
@@ -288,14 +340,14 @@ function App() {
       timerRender = (
         <div style={{ marginTop: '15px', border: '2px dashed var(--term-border)', padding: '10px', textAlign: 'center' }}>
             <div>ROUNDS IN AIR (ETA)</div>
-            <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>-{remaining.toFixed(1)}s</div>
+            <div>-{remaining.toFixed(1)}s</div>
         </div>
       );
     } else {
       timerRender = (
         <div className="splash-alert">
             IMPACT // SPLASH!
-            <div style={{ fontSize: '1rem', marginTop: '10px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setFireStart(null)}>
+            <div style={{ marginTop: '10px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setFireStart(null)}>
                 [ ACKNOWLEDGE ]
             </div>
         </div>
@@ -305,68 +357,149 @@ function App() {
 
   return (
     <div className="terminal-container">
-      <h1>M777 COMPUTER</h1>
+      <h1>M777 BALLISTIC COMPUTER</h1>
 
       <div className="input-section">
         <div className="input-group">
             <label>GUN GRID:</label>
-            <input 
-                type="text" 
-                value={gunGrid}
-                onChange={(e) => {
-                    setGunGrid(e.target.value);
-                    setFireStart(null);
-                }}
-            />
+            <div className="grid-inputs">
+                <div className="grid-input-wrapper">
+                    <span>X:</span>
+                    <input 
+                        type="text" 
+                        value={gunX}
+                        onChange={(e) => {
+                            setGunX(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+                <div className="grid-input-wrapper">
+                    <span>Y:</span>
+                    <input 
+                        type="text" 
+                        value={gunY}
+                        onChange={(e) => {
+                            setGunY(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+            </div>
         </div>
         <div className="input-group">
             <label>TGT GRID:</label>
-            <input 
-                type="text" 
-                value={targetGrid}
-                onChange={(e) => {
-                    setTargetGrid(e.target.value);
-                    setFireStart(null);
-                }}
-            />
+            <div className="grid-inputs">
+                <div className="grid-input-wrapper">
+                    <span>X:</span>
+                    <input 
+                        type="text" 
+                        value={tgtX}
+                        onChange={(e) => {
+                            setTgtX(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+                <div className="grid-input-wrapper">
+                    <span>Y:</span>
+                    <input 
+                        type="text" 
+                        value={tgtY}
+                        onChange={(e) => {
+                            setTgtY(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+            </div>
         </div>
         <div className="input-group">
-            <label>ELEV DELTA:</label>
-            <input 
-                type="number" 
-                value={elevDeltaStr}
-                onChange={(e) => {
-                    setElevDeltaStr(e.target.value);
-                    setFireStart(null);
-                }}
-            />
+            <label>GUN ELEV:</label>
+            <div className="grid-inputs">
+                <div className="grid-input-wrapper">
+                    <span>Z:</span>
+                    <input 
+                        type="number" 
+                        step="5"
+                        value={gunElevStr}
+                        onChange={(e) => {
+                            setGunElevStr(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+            </div>
+        </div>
+        <div className="input-group">
+            <label>TGT ELEV:</label>
+            <div className="grid-inputs">
+                <div className="grid-input-wrapper">
+                    <span>Z:</span>
+                    <input 
+                        type="number" 
+                        step="5"
+                        value={tgtElevStr}
+                        onChange={(e) => {
+                            setTgtElevStr(e.target.value);
+                            setFireStart(null);
+                        }}
+                    />
+                </div>
+            </div>
         </div>
         <div className="input-group" style={{ marginTop: '5px' }}>
             <label>OVRRIDE CHG:</label>
-            <select 
-                value={forcedCharge === null ? 'AUTO' : forcedCharge.toString()}
-                onChange={(e) => {
-                    setForcedCharge(e.target.value === 'AUTO' ? null : parseInt(e.target.value));
-                    setFireStart(null);
-                }}
-                style={{
-                    flex: 1,
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--term-border)',
-                    color: 'var(--term-fg)',
-                    fontFamily: 'inherit',
-                    fontSize: '1.2rem',
-                    padding: '4px',
-                    outline: 'none'
-                }}
-            >
-                <option value="AUTO" style={{ background: 'var(--term-bg)' }}>AUTO (OPTIMAL)</option>
-                <option value="1" style={{ background: 'var(--term-bg)' }}>CHARGE 1</option>
-                <option value="2" style={{ background: 'var(--term-bg)' }}>CHARGE 2</option>
-                <option value="3" style={{ background: 'var(--term-bg)' }}>CHARGE 3</option>
-                <option value="4" style={{ background: 'var(--term-bg)' }}>CHARGE 4</option>
-                <option value="5" style={{ background: 'var(--term-bg)' }}>CHARGE 5</option>
-            </select>
+            <div className="grid-inputs">
+                <div className="grid-input-wrapper">
+                    <span>C:</span>
+                    <select 
+                        value={forcedCharge === null ? 'AUTO' : forcedCharge.toString()}
+                        onChange={(e) => {
+                            setForcedCharge(e.target.value === 'AUTO' ? null : parseInt(e.target.value));
+                            setFireStart(null);
+                        }}
+                        style={{
+                            flex: 1,
+                            backgroundColor: 'transparent',
+                            border: '1px solid var(--term-border)',
+                            color: 'var(--term-fg)',
+                            fontFamily: 'inherit',
+                            padding: '4px',
+                            outline: 'none'
+                        }}
+                    >
+                        <option value="AUTO" style={{ background: 'var(--term-bg)' }}>AUTO (OPTIMAL)</option>
+                        <option value="1" style={{ background: 'var(--term-bg)' }}>CHARGE 1</option>
+                        <option value="2" style={{ background: 'var(--term-bg)' }}>CHARGE 2</option>
+                        <option value="3" style={{ background: 'var(--term-bg)' }}>CHARGE 3</option>
+                        <option value="4" style={{ background: 'var(--term-bg)' }}>CHARGE 4</option>
+                        <option value="5" style={{ background: 'var(--term-bg)' }}>CHARGE 5</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div className="input-group" style={{ marginTop: '5px' }}>
+            <label>ADJUST FIRE:</label>
+            <div className="grid-inputs" style={{ gap: '3px' }}>
+                <div className="grid-input-wrapper">
+                    <span>N:</span>
+                    <input type="number" step="10" placeholder="0" value={adjN} onChange={(e) => { setAdjN(e.target.value); setAdjS(''); setFireStart(null); }} />
+                </div>
+                <div className="grid-input-wrapper">
+                    <span>S:</span>
+                    <input type="number" step="10" placeholder="0" value={adjS} onChange={(e) => { setAdjS(e.target.value); setAdjN(''); setFireStart(null); }} />
+                </div>
+                <div className="grid-input-wrapper">
+                    <span>E:</span>
+                    <input type="number" step="10" placeholder="0" value={adjE} onChange={(e) => { setAdjE(e.target.value); setAdjW(''); setFireStart(null); }} />
+                </div>
+                <div className="grid-input-wrapper">
+                    <span>W:</span>
+                    <input type="number" step="10" placeholder="0" value={adjW} onChange={(e) => { setAdjW(e.target.value); setAdjE(''); setFireStart(null); }} />
+                </div>
+            </div>
         </div>
       </div>
 
@@ -379,7 +512,7 @@ function App() {
             <span>TGT (RANGE):</span>
             <div style={{ textAlign: 'right' }}>
                 <div>{gridData ? gridData.range : '----'} M</div>
-                <div style={{ fontSize: '0.8em', opacity: 0.8 }}>{' '}</div>
+                <div style={{ opacity: 0.8 }}>{' '}</div>
             </div>
         </div>
 
@@ -387,7 +520,7 @@ function App() {
             <span>C (CHARGE):</span>
             <div style={{ textAlign: 'right' }}>
                 <div style={{ color: forcedCharge ? '#fff' : 'inherit' }}>CHG {chargeStr}</div>
-                <div style={{ fontSize: '0.8em', opacity: 0.8 }}>{' '}</div>
+                <div style={{ opacity: 0.8 }}>{' '}</div>
             </div>
         </div>
 
@@ -395,15 +528,15 @@ function App() {
             <span>X (AZIMUTH):</span>
             <div style={{ textAlign: 'right' }}>
                 <div>{azMilStr} MILS</div>
-                <div style={{ fontSize: '0.8em', opacity: 0.8 }}>{azDegStr}°</div>
+                <div style={{ opacity: 0.8 }}>{azDegStr}°</div>
             </div>
         </div>
         
         <div className="result-row">
             <span>Y (ELEVATION):</span>
             <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 'bold' }}>{elMilStr} MILS</div>
-                <div style={{ fontSize: '0.8em', opacity: 0.8 }}>{elDegStr}°</div>
+                <div>{elMilStr} MILS</div>
+                <div style={{ opacity: 0.8 }}>{elDegStr}°</div>
             </div>
         </div>
 
@@ -411,6 +544,13 @@ function App() {
             <span>T (FLIGHT):</span>
             <div style={{ textAlign: 'right' }}>
                 <div>{tofStr} SEC</div>
+            </div>
+        </div>
+
+        <div className="result-row" style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '10px' }}>
+            <span>D (DISPERSION):</span>
+            <div style={{ textAlign: 'right' }}>
+                <div>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion} M` : '-- M'}</div>
             </div>
         </div>
       </div>
