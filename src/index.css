@@ -1,0 +1,176 @@
+@font-face {
+  font-family: 'TX02';
+  src: url('/TX02.ttf') format('truetype');
+}
+
+:root {
+  --term-bg: #000000;
+  --term-fg: #ffb000;
+  --term-border: #ffb000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--term-bg);
+  color: var(--term-fg);
+  font-family: 'TX02', monospace;
+}
+
+#root {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.terminal-container {
+  width: 100%;
+  border: 1px solid var(--term-border);
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  border-bottom: 3px double var(--term-border);
+  padding-bottom: 10px;
+  margin-top: 0;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+}
+
+.input-group label {
+  flex: 0 0 160px;
+  font-size: 1.2rem;
+}
+
+.input-group input {
+  flex: 1;
+  background-color: transparent;
+  border: 1px solid var(--term-border);
+  color: var(--term-fg);
+  font-family: inherit;
+  font-size: 1.2rem;
+  padding: 4px;
+  outline: none;
+}
+
+.input-group input:focus {
+  background-color: var(--term-fg);
+  color: var(--term-bg);
+}
+
+.results-section {
+  border: 1px dashed var(--term-border);
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.result-row:last-child {
+  margin-bottom: 0;
+}
+
+.alert {
+  color: #000;
+  background-color: var(--term-fg);
+  text-align: center;
+  padding: 5px;
+  margin-top: 5px;
+  font-weight: bold;
+}
+
+button {
+  background-color: var(--term-bg);
+  color: var(--term-fg);
+  border: 2px solid var(--term-border);
+  font-family: inherit;
+  font-size: 1.5rem;
+  padding: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  width: 100%;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: var(--term-fg);
+  color: var(--term-bg);
+}
+
+button:active {
+  background-color: #fff;
+  color: #000;
+}
+
+.splash-alert {
+  background-color: var(--term-fg);
+  color: var(--term-bg);
+  animation: blinker 0.2s linear infinite;
+  text-align: center;
+  font-weight: bold;
+  padding: 10px;
+  font-size: 1.5rem;
+  margin-top: 15px;
+  border: 2px solid var(--term-fg);
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.table-reference {
+  margin-top: 20px;
+  font-size: 1rem;
+}
+
+.table-reference summary {
+  cursor: pointer;
+  border: 1px solid var(--term-border);
+  padding: 5px;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.table-reference table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-reference th, .table-reference td {
+  border: 1px solid var(--term-border);
+  padding: 4px;
+  text-align: right;
+}
+
+.table-reference th {
+  text-align: center;
+}
