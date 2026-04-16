@@ -181,6 +181,64 @@ function interpolate(x: number, x0: number, x1: number, y0: number, y1: number) 
   return y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
 }
 
+const RepeatButton = ({ onClick, children, style, className }: any) => {
+  const timeoutRef = useRef<any>(null);
+  const intervalRef = useRef<any>(null);
+  const delayRef = useRef(150);
+  const onClickRef = useRef(onClick);
+
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
+
+  const startRepeating = () => {
+    // Fire the initial click immediately
+    onClickRef.current();
+    
+    delayRef.current = 200; 
+    clearTimeout(timeoutRef.current);
+    clearTimeout(intervalRef.current);
+    
+    timeoutRef.current = setTimeout(() => {
+      const run = () => {
+        onClickRef.current();
+        delayRef.current = Math.max(20, delayRef.current * 0.85); // Accelerate rapidly
+        intervalRef.current = setTimeout(run, delayRef.current);
+      };
+      run();
+    }, 400); // Wait 400ms before repeat begins
+  };
+
+  const stopRepeating = () => {
+    clearTimeout(timeoutRef.current);
+    clearTimeout(intervalRef.current);
+  };
+
+  return (
+    <button
+      className={className}
+      style={style}
+      onPointerDown={(e) => { 
+        e.preventDefault(); 
+        e.currentTarget.setPointerCapture(e.pointerId);
+        startRepeating(); 
+      }}
+      onPointerUp={(e) => { 
+        e.preventDefault(); 
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+        stopRepeating(); 
+      }}
+      onPointerLeave={(e) => { e.preventDefault(); stopRepeating(); }}
+      onPointerCancel={(e) => { e.preventDefault(); stopRepeating(); }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {children}
+    </button>
+  );
+};
+
 function App() {
   const [gunX, setGunX] = useState<string>('');
   const [gunY, setGunY] = useState<string>('');
@@ -423,7 +481,7 @@ function App() {
           const py = canvas.height - (y / mapMeters) * canvas.height;
           
           ctx.strokeStyle = '#ffbb00';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(px - 5, py); ctx.lineTo(px + 5, py);
           ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5);
@@ -618,6 +676,34 @@ function App() {
       else if (xOffset < 0) { setAdjE(''); setAdjW(Math.abs(xOffset).toString()); }
       else { setAdjE(''); setAdjW(''); }
       
+      setFireStart(null);
+  };
+
+  const handleGridAdjust = (type: 'gun' | 'tgt', dir: 'N' | 'S' | 'E' | 'W') => {
+      let xStr = type === 'gun' ? gunX : tgtX;
+      let yStr = type === 'gun' ? gunY : tgtY;
+      
+      let x = parseGridPiece(xStr) || 0;
+      let y = parseGridPiece(yStr) || 0;
+
+      if (dir === 'N') y += 10;
+      if (dir === 'S') y -= 10;
+      if (dir === 'E') x += 10;
+      if (dir === 'W') x -= 10;
+      
+      x = Math.max(0, x);
+      y = Math.max(0, y);
+
+      const newX = x.toString().padStart(4, '0');
+      const newY = y.toString().padStart(4, '0');
+
+      if (type === 'gun') {
+          setGunX(newX);
+          setGunY(newY);
+      } else {
+          setTgtX(newX);
+          setTgtY(newY);
+      }
       setFireStart(null);
   };
 
@@ -836,72 +922,107 @@ function App() {
           </div>
       )}
 
-
       {activePage === 'MAP' && (
-          <div className="map-page" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-             <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                 <div style={{ position: 'relative', maxHeight: '100%', maxWidth: '100%', aspectRatio: '1/1', overflow: 'hidden' }}>
-                     <canvas 
-                         ref={canvasRef} 
-                         width={800} 
-                         height={800} 
-                         onClick={handleCanvasClick} 
-                         style={{ 
-                             border: '1px solid var(--term-border)',
-                             width: '100%',
-                             height: '100%',
-                             display: 'block',
-                             cursor: mapMode ? 'crosshair' : 'default'
-                         }} 
-                     />
+          <div className="map-page map-responsive-wrapper">
+             <div className="map-canvas-container">
+                 <canvas 
+                     ref={canvasRef} 
+                     width={800} 
+                     height={800} 
+                     onClick={handleCanvasClick} 
+                     style={{ 
+                         border: '1px solid var(--term-border)',
+                         width: '100%',
+                         height: '100%',
+                         display: 'block',
+                         cursor: mapMode ? 'crosshair' : 'default'
+                     }} 
+                 />
+                 
+                 {showMapSizeInput && (
+                      <div style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 12, backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
+                          <input 
+                              type="number" 
+                              value={mapSize} 
+                              onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                              style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
+                          />
+                          <span style={{ fontSize: '12px' }}>KM</span>
+                      </div>
+                  )}
+                 
+                 {timerRender}
+
+                 {showBDT && (
+                      <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
+                          {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                              <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span>{chargeStr}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
+                      </div>
+                  )}
+             </div>
+
+             {showDPad && (
+                 <div className="dpads-sidebar">
                      
-                     {showMapSizeInput && (
-                          <div style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 12, backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
-                              <input 
-                                  type="number" 
-                                  value={mapSize} 
-                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
-                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
-                              />
-                              <span style={{ fontSize: '12px' }}>KM</span>
-                          </div>
-                      )}
-                     
-                     {showDPad && (
-                          <div className="d-pad" style={{ position: 'absolute', top: '15px', right: '15px', display: 'grid', gridTemplateColumns: 'repeat(3, 24px)', gridTemplateRows: 'repeat(3, 24px)', gap: '4px', zIndex: 10, fontSize: '20px' }}>
+                     {/* GUN D-PAD */}
+                     <div className="dpad-item">
+                         <span className="dpad-item-title">GUN POS</span>
+                         <div className="dpad-grid">
                              <div />
-                             <button onClick={() => handleAdjust('N')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▲</button>
+                             <RepeatButton onClick={() => handleGridAdjust('gun', 'N')} className="dpad-btn">▲</RepeatButton>
                              <div />
-                             <button onClick={() => handleAdjust('W')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>◀</button>
-                             <button onClick={handleResetAdjust} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', borderStyle: 'dotted', fontSize: '14px' }}>⨯</button>
-                             <button onClick={() => handleAdjust('E')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▶</button>
+                             <RepeatButton onClick={() => handleGridAdjust('gun', 'W')} className="dpad-btn">◀</RepeatButton>
                              <div />
-                             <button onClick={() => handleAdjust('S')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▼</button>
+                             <RepeatButton onClick={() => handleGridAdjust('gun', 'E')} className="dpad-btn">▶</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleGridAdjust('gun', 'S')} className="dpad-btn">▼</RepeatButton>
                              <div />
                          </div>
-                      )}
+                     </div>
+
+                     {/* TARGET D-PAD */}
+                     <div className="dpad-item">
+                         <span className="dpad-item-title">TGT POS</span>
+                         <div className="dpad-grid">
+                             <div />
+                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'N')} className="dpad-btn">▲</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'W')} className="dpad-btn">◀</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'E')} className="dpad-btn">▶</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'S')} className="dpad-btn">▼</RepeatButton>
+                             <div />
+                         </div>
+                     </div>
                      
-                     {timerRender}
+                     {/* ADJUSTMENT D-PAD */}
+                     <div className="dpad-item">
+                         <span className="dpad-item-title">ADJUST</span>
+                         <div className="dpad-grid">
+                             <div />
+                             <RepeatButton onClick={() => handleAdjust('N')} className="dpad-btn">▲</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleAdjust('W')} className="dpad-btn">◀</RepeatButton>
+                             <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset">⨯</button>
+                             <RepeatButton onClick={() => handleAdjust('E')} className="dpad-btn">▶</RepeatButton>
+                             <div />
+                             <RepeatButton onClick={() => handleAdjust('S')} className="dpad-btn">▼</RepeatButton>
+                             <div />
+                         </div>
+                     </div>
 
-                     {showBDT && (
-                          <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
-                              {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-                                  <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
-                              )}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span>{chargeStr}</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
-                          </div>
-                      )}
                  </div>
-             </div>
-             
-
+             )}
           </div>
        )}
         </div>
