@@ -837,8 +837,8 @@ function App() {
 
 
       {activePage === 'MAP' && (
-          <div className="map-page" style={{ display: 'flex', flexDirection: 'column', order: 1, minWidth: 0 }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+          <div className="map-page" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ fontWeight: 600 }}>TACTICAL GRID</span>
                 <div>
                    SIZE: <input 
@@ -851,8 +851,8 @@ function App() {
              </div>
 
 
-             <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                 <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden' }}>
+             <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', alignItems: 'flex-start' }}>
+                 <div style={{ position: 'relative', aspectRatio: '1/1', maxWidth: '100%', maxHeight: '100%', overflow: 'hidden' }}>
                      <canvas 
                          ref={canvasRef} 
                          width={800} 

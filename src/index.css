@@ -13,6 +13,13 @@
   box-sizing: border-box;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -24,32 +31,43 @@ body {
 }
 
 #root {
-  padding: 20px;
-  max-width: 900px;
+  padding: 8px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-left: max(8px, env(safe-area-inset-left));
+  padding-right: max(8px, env(safe-area-inset-right));
+  height: 100dvh;
+  box-sizing: border-box;
   margin: 0 auto;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .mfd-outer {
-  border: 4px double var(--term-border);
+  border: 2px solid var(--term-border);
   padding: 4px;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .mfd-main {
   display: flex;
+  flex: 1;
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--term-border);
 }
 
 .mfd-sidebar {
   display: flex;
   flex-direction: column;
-  padding: 10px 5px;
-  gap: 20px;
-  width: 90px;
+  padding: 6px 4px;
+  gap: 8px;
+  width: 72px;
   flex-shrink: 0;
   background: #000;
 }
@@ -65,12 +83,15 @@ body {
   border: 2px solid var(--term-border);
   color: var(--term-fg);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   text-align: center;
-  padding: 15px 4px;
+  padding: 10px 2px;
   cursor: pointer;
   outline: none;
   font-weight: bold;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .osb-button.active {
   background: var(--term-fg);
@@ -81,12 +102,14 @@ body {
 }
 
 .mfd-screen {
-  padding: 20px;
+  padding: 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
   background: #000;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .terminal-container {
@@ -95,9 +118,10 @@ body {
 
 h1 {
   text-align: center;
-  border-bottom: 3px double var(--term-border);
-  padding-bottom: 10px;
+  border-bottom: 1px solid var(--term-border);
+  padding-bottom: 8px;
   margin-top: 0;
+  margin-bottom: 8px;
   text-transform: uppercase;
   font-size: inherit;
   font-weight: normal;
