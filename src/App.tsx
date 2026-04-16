@@ -257,6 +257,7 @@ function App() {
 
   const [showDPad, setShowDPad] = useState<boolean>(true);
   const [showBDT, setShowBDT] = useState<boolean>(true);
+  const [bdtPosition, setBdtPosition] = useState<'bottom-left' | 'top-left'>('bottom-left');
   const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
   const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('COORDS');
@@ -915,6 +916,24 @@ function App() {
                           </span>
                       </label>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                      <label style={{ lineHeight: 1.5 }}>BDT LOCATION</label>
+                      <select 
+                          value={bdtPosition} 
+                          onChange={(e) => setBdtPosition(e.target.value as 'bottom-left' | 'top-left')}
+                          style={{
+                              backgroundColor: 'transparent',
+                              border: '1px solid var(--term-border)',
+                              color: 'var(--term-fg)',
+                              fontFamily: 'inherit',
+                              padding: '2px',
+                              outline: 'none'
+                          }}
+                      >
+                          <option value="bottom-left" style={{ background: 'var(--term-bg)' }}>BOTTOM LEFT</option>
+                          <option value="top-left" style={{ background: 'var(--term-bg)' }}>TOP LEFT</option>
+                      </select>
+                  </div>
               </div>
               <div style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '8px', opacity: 0.4, fontSize: '10px' }}>
                   M107 HE / M777A2 HOW / ARMA REFORGER MOD
@@ -955,17 +974,17 @@ function App() {
                  {timerRender}
 
                  {showBDT && (
-                      <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
+                      <div style={{ position: 'absolute', bottom: bdtPosition === 'bottom-left' ? '15px' : undefined, top: bdtPosition === 'top-left' ? '50px' : undefined, left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
                           {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
                               <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
                           )}
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span>{chargeStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
                       </div>
                   )}
              </div>
