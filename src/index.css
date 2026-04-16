@@ -25,14 +25,72 @@ body {
 
 #root {
   padding: 20px;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.mfd-outer {
+  border: 4px double var(--term-border);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mfd-main {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--term-border);
+}
+
+.mfd-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 5px;
+  gap: 20px;
+  width: 90px;
+  flex-shrink: 0;
+  background: #000;
+}
+.mfd-sidebar.left {
+  border-right: 2px dashed var(--term-border);
+}
+.mfd-sidebar.right {
+  border-left: 2px dashed var(--term-border);
+}
+
+.osb-button {
+  background: var(--term-bg);
+  border: 2px solid var(--term-border);
+  color: var(--term-fg);
+  font-family: inherit;
+  font-size: 11px;
+  text-align: center;
+  padding: 15px 4px;
+  cursor: pointer;
+  outline: none;
+  font-weight: bold;
+}
+.osb-button.active {
+  background: var(--term-fg);
+  color: var(--term-bg);
+}
+.osb-button:active {
+  transform: scale(0.95);
+}
+
+.mfd-screen {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  min-width: 0;
 }
 
 .terminal-container {
   width: 100%;
-  border: 1px solid var(--term-border);
-  padding: 20px;
 }
 
 h1 {

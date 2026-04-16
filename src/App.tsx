@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import './index.css';
 
 // M107 HE Ballistic Data for Charges 1-5
@@ -27,7 +27,7 @@ const CHARGES = [
     id: 2,
     min: 1500,
     max: 2500,
-    dispersion: 85,
+    dispersion: 69,
     data: [
         { range: 1500, elev: 1270, tof: 33.1 },
         { range: 1550, elev: 1257, tof: 33.0 },
@@ -56,7 +56,7 @@ const CHARGES = [
     id: 3,
     min: 2100,
     max: 3600,
-    dispersion: 110,
+    dispersion: 69,
     data: [
         { range: 2100, elev: 1272, tof: 41.0 },
         { range: 2200, elev: 1253, tof: 40.8 },
@@ -80,7 +80,7 @@ const CHARGES = [
     id: 4,
     min: 2600,
     max: 4500,
-    dispersion: 135,
+    dispersion: 69,
     data: [
         { range: 2600, elev: 1271, tof: 47.2 },
         { range: 2700, elev: 1255, tof: 47.0 },
@@ -108,7 +108,7 @@ const CHARGES = [
     id: 5,
     min: 3000,
     max: 5300,
-    dispersion: 160,
+    dispersion: 69,
     data: [
         { range: 3000, elev: 1271, tof: 52.2 },
         { range: 3100, elev: 1258, tof: 52.0 },
@@ -194,6 +194,15 @@ function App() {
   const [tgtElevStr, setTgtElevStr] = useState<string>('0');
   const [forcedCharge, setForcedCharge] = useState<number | null>(null);
   
+  const [mapSize, setMapSize] = useState<number>(8);
+  const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
+
+  const [showDPad, setShowDPad] = useState<boolean>(true);
+  const [showBDT, setShowBDT] = useState<boolean>(true);
+  const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
+  const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('COORDS');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const [fireStart, setFireStart] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
 
@@ -205,7 +214,29 @@ function App() {
     return () => clearInterval(interval);
   }, [fireStart]);
 
-  const gridData = useMemo(() => calculateAzimuthAndRange(gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW), [gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW]);
+  const gridData = useMemo(() => calculateAzimuthAndRange(gunX, gunY, tgtX, tgtY, '0', '0', '0', '0'), [gunX, gunY, tgtX, tgtY]);
+
+  const handleCommitAdj = () => {
+      let t_x = parseGridPiece(tgtX);
+      let t_y = parseGridPiece(tgtY);
+      const isAdjusted = (parseFloat(adjN||'0') !== 0 || parseFloat(adjS||'0') !== 0 || parseFloat(adjE||'0') !== 0 || parseFloat(adjW||'0') !== 0);
+      
+      if (isAdjusted && t_x !== null && t_y !== null) {
+          t_x += parseFloat(adjE || '0');
+          t_x -= parseFloat(adjW || '0');
+          t_y += parseFloat(adjN || '0');
+          t_y -= parseFloat(adjS || '0');
+          
+          setTgtX(String(Math.abs(Math.round(t_x))).padStart(4, '0'));
+          setTgtY(String(Math.abs(Math.round(t_y))).padStart(4, '0'));
+          
+          setAdjN('');
+          setAdjS('');
+          setAdjE('');
+          setAdjW('');
+          setFireStart(null);
+      }
+  };
 
   const activeRange = gridData ? gridData.range.toString() : '';
 
@@ -213,9 +244,10 @@ function App() {
     try {
         if (!activeRange) return { valid: false, message: 'WAITING FOR DATA...' };
 
-        const r = parseFloat(activeRange);
+        const rawR = parseFloat(activeRange);
         
-        if (isNaN(r)) return { valid: false, message: 'INVALID RANGE' };
+        if (isNaN(rawR)) return { valid: false, message: 'INVALID RANGE' };
+        const r = rangeCorrection ? rawR * 0.96 : rawR;
         
         // Find viable charge
         let activeCharge = null;
@@ -270,29 +302,28 @@ function App() {
 
     let angleFix = 0;
     let tofFix = 0;
-    
-    if (deltaH !== 0 && activeCharge.data.length > 1) {
-        // Derive local slope to calculate accurate high-angle parallax correction
+
+    if (deltaH !== 0 && r > 0) {
+        // Correct geometric elevation correction:
+        // The vertical angle to the target (in mils) must be added to the flat-earth table elevation.
+        // This is: atan(deltaH / range) converted from radians to NATO mils (6400 / 2π).
+        const vertAngleRad = Math.atan2(deltaH, r);
+        const vertAngleMils = vertAngleRad * (6400 / (2 * Math.PI));
+        angleFix = vertAngleMils; // positive = target higher = need more elevation
+
+        // TOF correction: tgt altitude changes effective range slightly.
+        // Approximate via slope of the charge table at current range.
         let idx = lowerIndex;
-        if (idx >= activeCharge.data.length - 1) {
-            idx = activeCharge.data.length - 2;
-        }
-        
-        const currentData = activeCharge.data[idx];
-        const nextData = activeCharge.data[idx + 1];
-        
-        const dRange = nextData.range - currentData.range;
-        const dElev_dRange = (nextData.elev - currentData.elev) / dRange;
-        const dTof_dRange = (nextData.tof - currentData.tof) / dRange;
-        
-        // M777 High Angle: 100m height diff corresponds perfectly to 50m horizontal range diff (2:1 slope at impact).
-        // effective step = deltaH * 0.5
-        angleFix = -dElev_dRange * (deltaH * 0.5);
-        tofFix = -dTof_dRange * (deltaH * 0.5);
+        if (idx >= activeCharge.data.length - 1) idx = activeCharge.data.length - 2;
+        const dRange = activeCharge.data[idx + 1].range - activeCharge.data[idx].range;
+        const dTof_dRange = (activeCharge.data[idx + 1].tof - activeCharge.data[idx].tof) / dRange;
+        // Slant range correction: actual slant = sqrt(r² + deltaH²), not r
+        const slantRange = Math.sqrt(r * r + deltaH * deltaH);
+        tofFix = dTof_dRange * (slantRange - r);
     }
-    
-    const finalElev = Math.round(baseElev - angleFix);
-    const finalTof = Math.round((tof - tofFix) * 10) / 10;
+
+    const finalElev = Math.round(baseElev + angleFix);
+    const finalTof = Math.round((tof + tofFix) * 10) / 10;
 
     if (finalElev < 0 || finalElev > 1300) {
         return { valid: false, message: 'SOLUTION IMPOSSIBLE (TRAVERSAL LIMIT)' };
@@ -312,7 +343,17 @@ function App() {
     } catch (err: any) {
         return { valid: false, message: `CRASH: ${err.message}` };
     }
-  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge]);
+  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, rangeCorrection]);
+
+  useEffect(() => {
+    if (fireStart !== null && calculation.valid && calculation.tof) {
+        const elapsed = (now - fireStart) / 1000;
+        if (calculation.tof - elapsed < -3) {
+            setFireStart(null);
+        }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fireStart, now, calculation.valid, calculation.tof]);
 
   const azMilStr = gridData ? gridData.azimuth.toString().padStart(4, '0') : '----';
   const azDegStr = gridData ? (gridData.azimuth * (360 / 6400)).toFixed(1) : '--.-';
@@ -324,6 +365,269 @@ function App() {
 
   const chargeStr = (calculation.valid && calculation.charge !== undefined) ? calculation.charge : '-';
 
+  useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const mapMeters = mapSize * 1000;
+      
+      // Clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 100m Sub-grid (Faint)
+      ctx.strokeStyle = '#ffbb0040';
+      ctx.lineWidth = 1.0;
+      ctx.setLineDash([]); 
+      ctx.beginPath();
+      for (let i = 0; i <= mapSize * 10; i++) {
+          if (i % 10 === 0) continue; // Skip the 1km major lines
+          const px = Math.floor((i * 100 / mapMeters) * canvas.width) + 0.5;
+          ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
+          
+          const py = Math.floor(canvas.height - (i * 100 / mapMeters) * canvas.height) + 0.5;
+          ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
+      }
+      ctx.stroke();
+
+      // 1km Major grid (Solid)
+      ctx.strokeStyle = '#ffbb0080';
+      ctx.lineWidth = 1.0;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let i = 0; i <= mapSize; i++) {
+          const px = Math.floor((i * 1000 / mapMeters) * canvas.width) + 0.5;
+          ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
+          
+          const py = Math.floor(canvas.height - (i * 1000 / mapMeters) * canvas.height) + 0.5;
+          ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Labels
+      ctx.fillStyle = '#ffbb00';
+      ctx.font = '10px monospace';
+      for (let i = 0; i <= mapSize; i++) {
+          const px = (i * 1000 / mapMeters) * canvas.width;
+          ctx.fillText((i).toString().padStart(2,'0'), px + 2, canvas.height - 2);
+          const py = canvas.height - (i * 1000 / mapMeters) * canvas.height;
+          if (i > 0) ctx.fillText((i).toString().padStart(2,'0'), 2, py - 2);
+      }
+
+      const drawPoint = (x: number | null, y: number | null, label: string) => {
+          if (x === null || y === null) return null;
+          const px = (x / mapMeters) * canvas.width;
+          const py = canvas.height - (y / mapMeters) * canvas.height;
+          
+          ctx.strokeStyle = '#ffbb00';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(px - 5, py); ctx.lineTo(px + 5, py);
+          ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5);
+          ctx.stroke();
+          ctx.fillStyle = '#ffbb00';
+          ctx.fillText(label, px + 8, py - 8);
+          return {px, py};
+      };
+
+      const g_x = parseGridPiece(gunX);
+      const g_y = parseGridPiece(gunY);
+      const t_x = parseGridPiece(tgtX);
+      const t_y = parseGridPiece(tgtY);
+
+      let gunPos = drawPoint(g_x, g_y, 'GUN');
+
+      if (gunPos) {
+          let minR = 950;
+          let maxR = 5300;
+          
+          if (forcedCharge !== null) {
+              const fc = CHARGES.find(c => c.id === forcedCharge);
+              if (fc) {
+                  minR = fc.min;
+                  maxR = fc.max;
+              }
+          }
+
+          const minRPx = (minR / mapMeters) * canvas.width;
+          const maxRPx = (maxR / mapMeters) * canvas.width;
+          
+          ctx.strokeStyle = '#ffbb00';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([]);
+
+          // Draw Min Range Ring
+          ctx.beginPath();
+          ctx.arc(gunPos.px, gunPos.py, Math.max(1, minRPx), 0, 2 * Math.PI);
+          ctx.stroke();
+
+          // Draw Max Range Ring
+          ctx.beginPath();
+          ctx.arc(gunPos.px, gunPos.py, Math.max(1, maxRPx), 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          ctx.setLineDash([]);
+      }
+      
+      let tgtOrigPos = drawPoint(t_x, t_y, 'TGT');
+      
+      const isAdjusted = (parseFloat(adjN||'0') !== 0 || parseFloat(adjS||'0') !== 0 || parseFloat(adjE||'0') !== 0 || parseFloat(adjW||'0') !== 0);
+      
+      let final_tx = t_x;
+      let final_ty = t_y;
+      if (final_tx !== null) {
+          final_tx += parseFloat(adjE || '0');
+          final_tx -= parseFloat(adjW || '0');
+      }
+      if (final_ty !== null) {
+          final_ty += parseFloat(adjN || '0');
+          final_ty -= parseFloat(adjS || '0');
+      }
+      
+      let tgtAdjPos = null;
+      if (isAdjusted) {
+          tgtAdjPos = drawPoint(final_tx, final_ty, 'ADJ');
+          if (tgtOrigPos && tgtAdjPos) {
+              ctx.strokeStyle = '#ffbb0080';
+              ctx.setLineDash([2, 4]);
+              ctx.beginPath();
+              ctx.moveTo(tgtOrigPos.px, tgtOrigPos.py);
+              ctx.lineTo(tgtAdjPos.px, tgtAdjPos.py);
+              ctx.stroke();
+              ctx.setLineDash([]);
+          }
+      }
+
+      const activeTgtPos = tgtOrigPos;
+
+      if (gunPos && activeTgtPos) {
+          ctx.strokeStyle = '#ffbb00';
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(gunPos.px, gunPos.py);
+          ctx.lineTo(activeTgtPos.px, activeTgtPos.py);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          let isHit = false;
+          let progress = 0;
+          if (fireStart !== null && calculation.valid && calculation.tof) {
+              const elapsed = (Date.now() - fireStart) / 1000;
+              progress = elapsed / calculation.tof;
+              if (progress >= 1) isHit = true;
+          }
+          
+          if (calculation.valid && calculation.dispersion) {
+              const rPx = (calculation.dispersion / mapMeters) * canvas.width;
+              ctx.beginPath();
+              
+              if (isHit) {
+                  const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
+                  ctx.setLineDash(blinkOn ? [] : [2, 4]); 
+                  ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
+                  ctx.strokeStyle = '#ff0000';
+                  ctx.lineWidth = blinkOn ? 3 : 1; 
+                  ctx.stroke();
+                  if (blinkOn) {
+                      ctx.fillStyle = '#ff000080';
+                      ctx.fill();
+                  }
+              } else {
+                  ctx.setLineDash([2, 4]); 
+                  ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
+                  ctx.strokeStyle = '#ffbb00';
+                  ctx.lineWidth = 1;
+                  ctx.stroke();
+              }
+              
+              ctx.setLineDash([]);
+              ctx.lineWidth = 1;
+          }
+          
+          if (fireStart !== null && progress >= 0 && progress <= 1 && !isHit) {
+              const currentPx = gunPos.px + (activeTgtPos.px - gunPos.px) * progress;
+              const currentPy = gunPos.py + (activeTgtPos.py - gunPos.py) * progress;
+              
+              const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
+              ctx.beginPath();
+              ctx.arc(currentPx, currentPy, 4, 0, 2 * Math.PI);
+              if (blinkOn) {
+                  ctx.fillStyle = '#ffbb00';
+                  ctx.fill();
+              } else {
+                  ctx.strokeStyle = '#ffbb00';
+                  ctx.lineWidth = 2;
+                  ctx.stroke();
+              }
+          }
+      }
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStart]);
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!mapMode) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const xPx = e.clientX - rect.left;
+      const yPx = e.clientY - rect.top;
+      
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = xPx * scaleX;
+      const py = yPx * scaleY;
+      
+      const mapMeters = mapSize * 1000;
+      const coordX = Math.round((px / canvas.width) * mapMeters);
+      const coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters);
+      
+      if (mapMode === 'gun') {
+          setGunX(coordX.toString());
+          setGunY(coordY.toString());
+          setMapMode(null);
+          setFireStart(null);
+      } else if (mapMode === 'tgt') {
+          setTgtX(coordX.toString());
+          setTgtY(coordY.toString());
+          setMapMode(null);
+          setFireStart(null);
+      }
+  };
+
+  const handleAdjust = (dir: 'N' | 'S' | 'E' | 'W') => {
+      let n = parseInt(adjN || '0');
+      let s = parseInt(adjS || '0');
+      let e = parseInt(adjE || '0');
+      let w = parseInt(adjW || '0');
+      
+      let yOffset = n - s;
+      let xOffset = e - w;
+      
+      if (dir === 'N') yOffset += 10;
+      if (dir === 'S') yOffset -= 10;
+      if (dir === 'E') xOffset += 10;
+      if (dir === 'W') xOffset -= 10;
+      
+      if (yOffset > 0) { setAdjN(yOffset.toString()); setAdjS(''); }
+      else if (yOffset < 0) { setAdjN(''); setAdjS(Math.abs(yOffset).toString()); }
+      else { setAdjN(''); setAdjS(''); }
+      
+      if (xOffset > 0) { setAdjE(xOffset.toString()); setAdjW(''); }
+      else if (xOffset < 0) { setAdjE(''); setAdjW(Math.abs(xOffset).toString()); }
+      else { setAdjE(''); setAdjW(''); }
+      
+      setFireStart(null);
+  };
+
+  const handleResetAdjust = () => {
+      setAdjN('');
+      setAdjS('');
+      setAdjE('');
+      setAdjW('');
+      setFireStart(null);
+  };
+
   const handleFire = () => {
     if (calculation.valid) {
       setFireStart(Date.now());
@@ -334,32 +638,46 @@ function App() {
   let timerRender = null;
   if (fireStart !== null && calculation.valid && calculation.tof) {
     const elapsed = (now - fireStart) / 1000;
-    const remaining = Math.max(0, calculation.tof - elapsed);
+    const remaining = calculation.tof - elapsed;
 
     if (remaining > 0) {
       timerRender = (
-        <div style={{ marginTop: '15px', border: '2px dashed var(--term-border)', padding: '10px', textAlign: 'center' }}>
-            <div>ROUNDS IN AIR (ETA)</div>
-            <div>-{remaining.toFixed(1)}s</div>
-        </div>
+         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px', background: 'var(--term-bg)', border: '1px dashed var(--term-border)', color: 'var(--term-text)', fontSize: '14px', zIndex: 10 }}>
+             T - {remaining.toFixed(1)}
+         </div>
       );
-    } else {
+    } else if (remaining > -3) {
+      const blinkOn = Math.floor(Date.now() / 250) % 2 === 0;
       timerRender = (
-        <div className="splash-alert">
-            IMPACT // SPLASH!
-            <div style={{ marginTop: '10px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setFireStart(null)}>
-                [ ACKNOWLEDGE ]
-            </div>
-        </div>
+         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px 10px', background: blinkOn ? '#ff0000' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ff0000', border: '1px solid #ff0000', fontSize: '14px', fontWeight: 'bold', zIndex: 10 }}>
+             SPLASH
+         </div>
       );
     }
   }
 
-  return (
-    <div className="terminal-container">
-      <h1>M777 BALLISTIC COMPUTER</h1>
+  const adjNS = adjN ? `N ${adjN}` : (adjS ? `S ${adjS}` : '');
+  const adjEW = adjE ? `E ${adjE}` : (adjW ? `W ${adjW}` : '');
+  let adjStr = `${adjNS}  ${adjEW}`.trim();
+  if (!adjStr) adjStr = '-- M';
 
-      <div className="input-section">
+  return (
+    <div className="mfd-outer">
+      <header className="terminal-header" style={{ borderBottom: '2px dashed var(--term-border)', paddingBottom: '10px', marginBottom: '10px' }}>
+        <h1 style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>M777 BALLISTIC MFD</h1>
+      </header>
+
+      <div className="mfd-main">
+        <div className="mfd-sidebar left">
+            <button className={`osb-button ${activePage === 'COORDS' ? 'active' : ''}`} onClick={() => setActivePage('COORDS')}>COORDS</button>
+            <div style={{ flex: 1 }} />
+            <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
+            <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>TACTCL<br/>MAP</button>
+        </div>
+
+        <div className="mfd-screen">
+          {activePage === 'COORDS' && (
+            <div className="input-section" style={{ flex: 1, overflowY: 'auto' }}>
         <div className="input-group">
             <label>GUN GRID:</label>
             <div className="grid-inputs">
@@ -480,88 +798,199 @@ function App() {
             </div>
         </div>
         
-        <div className="input-group" style={{ marginTop: '5px' }}>
-            <label>ADJUST FIRE:</label>
-            <div className="grid-inputs" style={{ gap: '3px' }}>
-                <div className="grid-input-wrapper">
-                    <span>N:</span>
-                    <input type="number" step="10" placeholder="0" value={adjN} onChange={(e) => { setAdjN(e.target.value); setAdjS(''); setFireStart(null); }} />
-                </div>
-                <div className="grid-input-wrapper">
-                    <span>S:</span>
-                    <input type="number" step="10" placeholder="0" value={adjS} onChange={(e) => { setAdjS(e.target.value); setAdjN(''); setFireStart(null); }} />
-                </div>
-                <div className="grid-input-wrapper">
-                    <span>E:</span>
-                    <input type="number" step="10" placeholder="0" value={adjE} onChange={(e) => { setAdjE(e.target.value); setAdjW(''); setFireStart(null); }} />
-                </div>
-                <div className="grid-input-wrapper">
-                    <span>W:</span>
-                    <input type="number" step="10" placeholder="0" value={adjW} onChange={(e) => { setAdjW(e.target.value); setAdjE(''); setFireStart(null); }} />
-                </div>
             </div>
-        </div>
-      </div>
+          )}
 
-      <div className="results-section">
-        {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-            <div className="alert">{calculation.message}</div>
-        )}
-        
-        <div className="result-row">
-            <span>TGT (RANGE):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div>{gridData ? gridData.range : '----'} M</div>
-                <div style={{ opacity: 0.8 }}>{' '}</div>
-            </div>
-        </div>
 
-        <div className="result-row">
-            <span>C (CHARGE):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div style={{ color: forcedCharge ? '#fff' : 'inherit' }}>CHG {chargeStr}</div>
-                <div style={{ opacity: 0.8 }}>{' '}</div>
-            </div>
-        </div>
 
-        <div className="result-row" style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '10px' }}>
-            <span>X (AZIMUTH):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div>{azMilStr} MILS</div>
-                <div style={{ opacity: 0.8 }}>{azDegStr}°</div>
-            </div>
-        </div>
-        
-        <div className="result-row">
-            <span>Y (ELEVATION):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div>{elMilStr} MILS</div>
-                <div style={{ opacity: 0.8 }}>{elDegStr}°</div>
-            </div>
-        </div>
 
-        <div className="result-row">
-            <span>T (FLIGHT):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div>{tofStr} SEC</div>
-            </div>
-        </div>
 
-        <div className="result-row" style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '10px' }}>
-            <span>D (DISPERSION):</span>
-            <div style={{ textAlign: 'right' }}>
-                <div>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion} M` : '-- M'}</div>
-            </div>
-        </div>
-      </div>
-
-      {calculation.valid && fireStart === null && (
-          <button onClick={handleFire}>
-              FIRE ROUND
-          </button>
+      
+      {activePage === 'SETTINGS' && (
+          <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ borderBottom: '1px dashed var(--term-border)', paddingBottom: '8px', fontSize: '11px', letterSpacing: '0.1em' }}>
+                  SYSTEM CONFIGURATION
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <input
+                          id="range-correction-cb"
+                          type="checkbox"
+                          checked={rangeCorrection}
+                          onChange={(e) => setRangeCorrection(e.target.checked)}
+                          style={{ marginTop: '2px', accentColor: 'var(--term-fg)', cursor: 'pointer', width: '14px', height: '14px', flexShrink: 0 }}
+                      />
+                      <label htmlFor="range-correction-cb" style={{ cursor: 'pointer', lineHeight: 1.5 }}>
+                          RANGE CORRECTION (×0.96)<br/>
+                          <span style={{ opacity: 0.6, fontSize: '10px' }}>
+                              Compensates for ~4% overshoot observed in current mod version.
+                              Reduces effective range by 4% before table lookup.
+                          </span>
+                      </label>
+                  </div>
+              </div>
+              <div style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '8px', opacity: 0.4, fontSize: '10px' }}>
+                  M107 HE / M777A2 HOW / ARMA REFORGER MOD
+              </div>
+          </div>
       )}
 
-      {timerRender}
+
+      {activePage === 'MAP' && (
+          <div className="map-page" style={{ display: 'flex', flexDirection: 'column', order: 1, minWidth: 0 }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600 }}>TACTICAL GRID</span>
+                <div>
+                   SIZE: <input 
+                       type="number" 
+                       value={mapSize} 
+                       onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                       style={{ width: '40px', background: 'transparent', color: 'inherit', border: 'none', borderBottom: '1px dashed var(--term-border)', textAlign: 'center', outline: 'none', fontFamily: 'inherit' }} 
+                   /> KM
+                </div>
+             </div>
+
+
+             <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                 <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden' }}>
+                     <canvas 
+                         ref={canvasRef} 
+                         width={800} 
+                         height={800} 
+                         onClick={handleCanvasClick} 
+                         style={{ 
+                             border: '1px solid var(--term-border)',
+                             width: '100%',
+                             height: '100%',
+                             display: 'block',
+                             cursor: mapMode ? 'crosshair' : 'default'
+                         }} 
+                     />
+                     
+                     {showDPad && (
+                         <div className="d-pad" style={{ position: 'absolute', top: '15px', right: '15px', display: 'grid', gridTemplateColumns: 'repeat(3, 12px)', gridTemplateRows: 'repeat(3, 12px)', gap: '2px', zIndex: 10, fontSize: '10px' }}>
+                            <div />
+                            <button onClick={() => handleAdjust('N')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▲</button>
+                            <div />
+                            <button onClick={() => handleAdjust('W')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>◀</button>
+                            <button onClick={handleResetAdjust} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', borderStyle: 'dotted', fontSize: '8px' }}>⨯</button>
+                            <button onClick={() => handleAdjust('E')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▶</button>
+                            <div />
+                            <button onClick={() => handleAdjust('S')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▼</button>
+                            <div />
+                        </div>
+                     )}
+                     
+                     {timerRender}
+
+                     {showBDT && (
+                         <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '7px', lineHeight: '1.4', color: 'var(--term-text)', fontFamily: 'inherit', pointerEvents: 'none' }}>
+                             {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                                 <div style={{ color: '#ff4444', marginBottom: '2px' }}>{calculation.message}</div>
+                             )}
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>ADJ</span><span>{adjStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid var(--term-border)', marginTop: '2px', paddingTop: '2px' }}><span>CHG</span><span>{chargeStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid var(--term-border)', marginTop: '2px', paddingTop: '2px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
+                         </div>
+                     )}
+                 </div>
+             </div>
+             
+
+          </div>
+      )}
+        </div>
+
+        <div className="mfd-sidebar right">
+            {activePage === 'MAP' ? (
+                <>
+                    <button
+                        className={`osb-button ${mapMode === 'gun' ? 'active' : ''}`}
+                        onClick={() => setMapMode('gun')}
+                        style={{ borderStyle: mapMode === 'gun' ? 'solid' : 'dashed' }}
+                    >
+                        {mapMode === 'gun' ? 'SETN GUN' : 'SET GUN'}
+                    </button>
+                    <button
+                        className={`osb-button ${mapMode === 'tgt' ? 'active' : ''}`}
+                        onClick={() => setMapMode('tgt')}
+                        style={{ borderStyle: mapMode === 'tgt' ? 'solid' : 'dashed' }}
+                    >
+                        {mapMode === 'tgt' ? 'SETN TGT' : 'SET TGT'}
+                    </button>
+                    <button
+                        className="osb-button"
+                        onClick={handleCommitAdj}
+                        disabled={!adjN && !adjS && !adjE && !adjW}
+                        style={{
+                            opacity: (adjN || adjS || adjE || adjW) ? 1 : 0.2,
+                            borderStyle: (adjN || adjS || adjE || adjW) ? 'solid' : 'dashed'
+                        }}
+                    >
+                        COMMIT<br/>ADJ
+                    </button>
+                    <button
+                        className={`osb-button ${showDPad ? 'active' : ''}`}
+                        onClick={() => setShowDPad(!showDPad)}
+                        style={{ borderStyle: showDPad ? 'solid' : 'dashed' }}
+                    >
+                        {showDPad ? 'HIDE DPAD' : 'SHOW DPAD'}
+                    </button>
+                    <button
+                        className={`osb-button ${showBDT ? 'active' : ''}`}
+                        onClick={() => setShowBDT(!showBDT)}
+                        style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
+                    >
+                        {showBDT ? 'HIDE BDT' : 'SHOW BDT'}
+                    </button>
+                    <button
+                        className="osb-button"
+                        onClick={calculation.valid && fireStart === null ? handleFire : undefined}
+                        disabled={!calculation.valid || fireStart !== null}
+                        style={{
+                            opacity: (calculation.valid && fireStart === null) ? 1 : 0.2,
+                            borderStyle: (calculation.valid && fireStart === null) ? 'solid' : 'dashed'
+                        }}
+                    >
+                        FIRE
+                    </button>
+                </>
+            ) : (
+                <>
+                    <button
+                        className="osb-button"
+                        onClick={calculation.valid && fireStart === null ? handleFire : undefined}
+                        disabled={!calculation.valid || fireStart !== null}
+                        style={{
+                            opacity: (calculation.valid && fireStart === null) ? 1 : 0.2,
+                            borderStyle: (calculation.valid && fireStart === null) ? 'solid' : 'dashed'
+                        }}
+                    >
+                        FIRE
+                    </button>
+                    <button
+                        className="osb-button"
+                        onClick={handleCommitAdj}
+                        disabled={!adjN && !adjS && !adjE && !adjW}
+                        style={{
+                            opacity: (adjN || adjS || adjE || adjW) ? 1 : 0.2,
+                            borderStyle: (adjN || adjS || adjE || adjW) ? 'solid' : 'dashed'
+                        }}
+                    >
+                        COMMIT<br/>ADJ
+                    </button>
+                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>DATA</button>
+                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>SYS</button>
+                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>MENU</button>
+                </>
+            )}
+            <div style={{ flex: 1 }} />
+        </div>
+      </div>
     </div>
   );
 }
