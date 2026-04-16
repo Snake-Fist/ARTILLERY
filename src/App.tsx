@@ -199,6 +199,7 @@ function App() {
 
   const [showDPad, setShowDPad] = useState<boolean>(true);
   const [showBDT, setShowBDT] = useState<boolean>(true);
+  const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
   const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('COORDS');
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -527,11 +528,11 @@ function App() {
                   const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
                   ctx.setLineDash(blinkOn ? [] : [2, 4]); 
                   ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
-                  ctx.strokeStyle = '#ff0000';
+                  ctx.strokeStyle = '#ffbb00';
                   ctx.lineWidth = blinkOn ? 3 : 1; 
                   ctx.stroke();
                   if (blinkOn) {
-                      ctx.fillStyle = '#ff000080';
+                      ctx.fillStyle = '#ffbb0080';
                       ctx.fill();
                   }
               } else {
@@ -642,14 +643,14 @@ function App() {
 
     if (remaining > 0) {
       timerRender = (
-         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px', background: 'var(--term-bg)', border: '1px dashed var(--term-border)', color: 'var(--term-text)', fontSize: '14px', zIndex: 10 }}>
+         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px', background: 'var(--term-bg)', border: '1px dashed var(--term-border)', color: 'var(--term-fg)', fontSize: '14px', zIndex: 10 }}>
              T - {remaining.toFixed(1)}
          </div>
       );
     } else if (remaining > -3) {
       const blinkOn = Math.floor(Date.now() / 250) % 2 === 0;
       timerRender = (
-         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px 10px', background: blinkOn ? '#ff0000' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ff0000', border: '1px solid #ff0000', fontSize: '14px', fontWeight: 'bold', zIndex: 10 }}>
+         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px 10px', background: blinkOn ? '#ffbb00' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ffbb00', border: '1px solid #ffbb00', fontSize: '14px', fontWeight: 'bold', zIndex: 10 }}>
              SPLASH
          </div>
       );
@@ -663,16 +664,16 @@ function App() {
 
   return (
     <div className="mfd-outer">
-      <header className="terminal-header" style={{ borderBottom: '2px dashed var(--term-border)', paddingBottom: '10px', marginBottom: '10px' }}>
-        <h1 style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>M777 BALLISTIC MFD</h1>
+      <header className="terminal-header" style={{ borderBottom: '1px solid var(--term-border)', paddingBottom: '5px', marginBottom: '5px' }}>
+        <h1 style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>M777 BALLISTIC COMPUTER</h1>
       </header>
 
       <div className="mfd-main">
         <div className="mfd-sidebar left">
+            <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>MAP</button>
             <button className={`osb-button ${activePage === 'COORDS' ? 'active' : ''}`} onClick={() => setActivePage('COORDS')}>COORDS</button>
             <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
-            <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>TACTCL<br/>MAP</button>
         </div>
 
         <div className="mfd-screen">
@@ -838,21 +839,8 @@ function App() {
 
       {activePage === 'MAP' && (
           <div className="map-page" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center', flexShrink: 0 }}>
-                <span style={{ fontWeight: 600 }}>TACTICAL GRID</span>
-                <div>
-                   SIZE: <input 
-                       type="number" 
-                       value={mapSize} 
-                       onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
-                       style={{ width: '40px', background: 'transparent', color: 'inherit', border: 'none', borderBottom: '1px dashed var(--term-border)', textAlign: 'center', outline: 'none', fontFamily: 'inherit' }} 
-                   /> KM
-                </div>
-             </div>
-
-
-             <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', alignItems: 'flex-start' }}>
-                 <div style={{ position: 'relative', aspectRatio: '1/1', maxWidth: '100%', maxHeight: '100%', overflow: 'hidden' }}>
+             <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                 <div style={{ position: 'relative', maxHeight: '100%', maxWidth: '100%', aspectRatio: '1/1', overflow: 'hidden' }}>
                      <canvas 
                          ref={canvasRef} 
                          width={800} 
@@ -867,42 +855,55 @@ function App() {
                          }} 
                      />
                      
+                     {showMapSizeInput && (
+                          <div style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 12, backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
+                              <input 
+                                  type="number" 
+                                  value={mapSize} 
+                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
+                              />
+                              <span style={{ fontSize: '12px' }}>KM</span>
+                          </div>
+                      )}
+                     
                      {showDPad && (
-                         <div className="d-pad" style={{ position: 'absolute', top: '15px', right: '15px', display: 'grid', gridTemplateColumns: 'repeat(3, 12px)', gridTemplateRows: 'repeat(3, 12px)', gap: '2px', zIndex: 10, fontSize: '10px' }}>
-                            <div />
-                            <button onClick={() => handleAdjust('N')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▲</button>
-                            <div />
-                            <button onClick={() => handleAdjust('W')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>◀</button>
-                            <button onClick={handleResetAdjust} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', borderStyle: 'dotted', fontSize: '8px' }}>⨯</button>
-                            <button onClick={() => handleAdjust('E')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▶</button>
-                            <div />
-                            <button onClick={() => handleAdjust('S')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▼</button>
-                            <div />
-                        </div>
-                     )}
+                          <div className="d-pad" style={{ position: 'absolute', top: '15px', right: '15px', display: 'grid', gridTemplateColumns: 'repeat(3, 24px)', gridTemplateRows: 'repeat(3, 24px)', gap: '4px', zIndex: 10, fontSize: '20px' }}>
+                             <div />
+                             <button onClick={() => handleAdjust('N')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▲</button>
+                             <div />
+                             <button onClick={() => handleAdjust('W')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>◀</button>
+                             <button onClick={handleResetAdjust} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', borderStyle: 'dotted', fontSize: '14px' }}>⨯</button>
+                             <button onClick={() => handleAdjust('E')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▶</button>
+                             <div />
+                             <button onClick={() => handleAdjust('S')} style={{ padding: 0, margin: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>▼</button>
+                             <div />
+                         </div>
+                      )}
                      
                      {timerRender}
 
                      {showBDT && (
-                         <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '7px', lineHeight: '1.4', color: 'var(--term-text)', fontFamily: 'inherit', pointerEvents: 'none' }}>
-                             {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-                                 <div style={{ color: '#ff4444', marginBottom: '2px' }}>{calculation.message}</div>
-                             )}
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>ADJ</span><span>{adjStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid var(--term-border)', marginTop: '2px', paddingTop: '2px' }}><span>CHG</span><span>{chargeStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span>TOF</span><span>{tofStr}s</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid var(--term-border)', marginTop: '2px', paddingTop: '2px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
-                         </div>
-                     )}
+                          <div style={{ position: 'absolute', bottom: '15px', left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
+                              {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                                  <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
+                              )}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span>{chargeStr}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span>{azMilStr} / {azDegStr}°</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span>{elMilStr} / {elDegStr}°</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
+                          </div>
+                      )}
                  </div>
              </div>
              
 
           </div>
-      )}
+       )}
         </div>
 
         <div className="mfd-sidebar right">
@@ -922,17 +923,11 @@ function App() {
                     >
                         {mapMode === 'tgt' ? 'SETN TGT' : 'SET TGT'}
                     </button>
-                    <button
-                        className="osb-button"
-                        onClick={handleCommitAdj}
-                        disabled={!adjN && !adjS && !adjE && !adjW}
-                        style={{
-                            opacity: (adjN || adjS || adjE || adjW) ? 1 : 0.2,
-                            borderStyle: (adjN || adjS || adjE || adjW) ? 'solid' : 'dashed'
-                        }}
-                    >
-                        COMMIT<br/>ADJ
-                    </button>
+                    {(adjN || adjS || adjE || adjW) && (
+                        <button className="osb-button" onClick={handleCommitAdj}>
+                            COMMIT<br/>ADJ
+                        </button>
+                    )}
                     <button
                         className={`osb-button ${showDPad ? 'active' : ''}`}
                         onClick={() => setShowDPad(!showDPad)}
@@ -941,54 +936,41 @@ function App() {
                         {showDPad ? 'HIDE DPAD' : 'SHOW DPAD'}
                     </button>
                     <button
+                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
+                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
+                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
+                    >
+                        {showMapSizeInput ? 'HIDE SIZE' : 'MAP SIZE'}
+                    </button>
+                    <button
                         className={`osb-button ${showBDT ? 'active' : ''}`}
                         onClick={() => setShowBDT(!showBDT)}
                         style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
                     >
                         {showBDT ? 'HIDE BDT' : 'SHOW BDT'}
                     </button>
-                    <button
-                        className="osb-button"
-                        onClick={calculation.valid && fireStart === null ? handleFire : undefined}
-                        disabled={!calculation.valid || fireStart !== null}
-                        style={{
-                            opacity: (calculation.valid && fireStart === null) ? 1 : 0.2,
-                            borderStyle: (calculation.valid && fireStart === null) ? 'solid' : 'dashed'
-                        }}
-                    >
-                        FIRE
-                    </button>
+                    <div style={{ flex: 1 }} />
+                    {calculation.valid && fireStart === null && (
+                        <button className="osb-button" onClick={handleFire}>
+                            FIRE
+                        </button>
+                    )}
                 </>
             ) : (
                 <>
-                    <button
-                        className="osb-button"
-                        onClick={calculation.valid && fireStart === null ? handleFire : undefined}
-                        disabled={!calculation.valid || fireStart !== null}
-                        style={{
-                            opacity: (calculation.valid && fireStart === null) ? 1 : 0.2,
-                            borderStyle: (calculation.valid && fireStart === null) ? 'solid' : 'dashed'
-                        }}
-                    >
-                        FIRE
-                    </button>
-                    <button
-                        className="osb-button"
-                        onClick={handleCommitAdj}
-                        disabled={!adjN && !adjS && !adjE && !adjW}
-                        style={{
-                            opacity: (adjN || adjS || adjE || adjW) ? 1 : 0.2,
-                            borderStyle: (adjN || adjS || adjE || adjW) ? 'solid' : 'dashed'
-                        }}
-                    >
-                        COMMIT<br/>ADJ
-                    </button>
-                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>DATA</button>
-                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>SYS</button>
-                    <button className="osb-button" style={{ opacity: 0.2 }} disabled>MENU</button>
+                    {(adjN || adjS || adjE || adjW) && (
+                        <button className="osb-button" onClick={handleCommitAdj}>
+                            COMMIT<br/>ADJ
+                        </button>
+                    )}
+                    <div style={{ flex: 1 }} />
+                    {calculation.valid && fireStart === null && (
+                        <button className="osb-button" onClick={handleFire}>
+                            FIRE
+                        </button>
+                    )}
                 </>
             )}
-            <div style={{ flex: 1 }} />
         </div>
       </div>
     </div>

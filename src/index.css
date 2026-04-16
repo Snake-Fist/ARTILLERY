@@ -31,15 +31,13 @@ body {
 }
 
 #root {
-  padding: 8px;
   padding-top: max(8px, env(safe-area-inset-top));
   padding-bottom: max(8px, env(safe-area-inset-bottom));
-  padding-left: max(8px, env(safe-area-inset-left));
-  padding-right: max(8px, env(safe-area-inset-right));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   height: 100dvh;
+  width: 100%;
   box-sizing: border-box;
-  margin: 0 auto;
-  max-width: 900px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
