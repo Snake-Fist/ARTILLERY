@@ -259,20 +259,22 @@ function App() {
   const [showBDT, setShowBDT] = useState<boolean>(true);
   const [bdtPosition, setBdtPosition] = useState<'bottom-left' | 'top-left'>('bottom-left');
   const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
+  const [showCoordsInput, setShowCoordsInput] = useState<boolean>(false);
   const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
-  const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('COORDS');
+  const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('MAP');
+  const [cursorPos, setCursorPos] = useState<{clientPx: number, clientPy: number, coord: string} | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [fireStart, setFireStart] = useState<number | null>(null);
+  const [fireStarts, setFireStarts] = useState<{id: number, start: number, tof: number, tx: number, ty: number, disp: number}[]>([]);
   const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (fireStart !== null) {
+    if (fireStarts.length > 0) {
       interval = setInterval(() => setNow(Date.now()), 100);
     }
     return () => clearInterval(interval);
-  }, [fireStart]);
+  }, [fireStarts.length]);
 
   const gridData = useMemo(() => calculateAzimuthAndRange(gunX, gunY, tgtX, tgtY, '0', '0', '0', '0'), [gunX, gunY, tgtX, tgtY]);
 
@@ -294,7 +296,7 @@ function App() {
           setAdjS('');
           setAdjE('');
           setAdjW('');
-          setFireStart(null);
+          
       }
   };
 
@@ -406,14 +408,12 @@ function App() {
   }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, rangeCorrection]);
 
   useEffect(() => {
-    if (fireStart !== null && calculation.valid && calculation.tof) {
-        const elapsed = (now - fireStart) / 1000;
-        if (calculation.tof - elapsed < -3) {
-            setFireStart(null);
-        }
-    }
+    setFireStarts(prev => prev.filter(fs => {
+        const elapsed = (now - fs.start) / 1000;
+        return fs.tof - elapsed >= -3;
+    }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fireStart, now, calculation.valid, calculation.tof]);
+  }, [now]);
 
   const azMilStr = gridData ? gridData.azimuth.toString().padStart(4, '0') : '----';
   const azDegStr = gridData ? (gridData.azimuth * (360 / 6400)).toFixed(1) : '--.-';
@@ -489,6 +489,18 @@ function App() {
           ctx.stroke();
           ctx.fillStyle = '#ffbb00';
           ctx.fillText(label, px + 8, py - 8);
+
+          const xStr = Math.round(x).toString().padStart(4, '0').slice(-4);
+          const yStr = Math.round(y).toString().padStart(4, '0').slice(-4);
+          const coordStr = `${xStr} ${yStr}`;
+          
+          const tWidth = ctx.measureText(coordStr).width;
+          let textX = px + 8;
+          if (textX + tWidth > canvas.width - 5) {
+              textX = px - 8 - tWidth;
+          }
+          ctx.fillText(coordStr, textX, py + 12);
+          
           return {px, py};
       };
 
@@ -500,8 +512,8 @@ function App() {
       let gunPos = drawPoint(g_x, g_y, 'GUN');
 
       if (gunPos) {
-          let minR = 950;
-          let maxR = 5300;
+          let minR = CHARGES[0].min;
+          let maxR = CHARGES[CHARGES.length - 1].max;
           
           if (forcedCharge !== null) {
               const fc = CHARGES.find(c => c.id === forcedCharge);
@@ -509,6 +521,11 @@ function App() {
                   minR = fc.min;
                   maxR = fc.max;
               }
+          }
+
+          if (rangeCorrection) {
+              minR = minR / 0.96;
+              maxR = maxR / 0.96;
           }
 
           const minRPx = (minR / mapMeters) * canvas.width;
@@ -571,22 +588,32 @@ function App() {
           ctx.stroke();
           ctx.setLineDash([]);
 
-          let isHit = false;
-          let progress = 0;
-          if (fireStart !== null && calculation.valid && calculation.tof) {
-              const elapsed = (Date.now() - fireStart) / 1000;
-              progress = elapsed / calculation.tof;
-              if (progress >= 1) isHit = true;
-          }
-          
           if (calculation.valid && calculation.dispersion) {
               const rPx = (calculation.dispersion / mapMeters) * canvas.width;
               ctx.beginPath();
+              ctx.setLineDash([2, 4]); 
+              ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
+              ctx.strokeStyle = '#ffbb00';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+              ctx.setLineDash([]);
+          }
+          
+          fireStarts.forEach((fs) => {
+              const elapsed = (Date.now() - fs.start) / 1000;
+              const progress = elapsed / fs.tof;
+              const isHit = progress >= 1;
+              
+              const tOrigPx = (fs.tx / mapMeters) * canvas.width;
+              const tOrigPy = canvas.height - (fs.ty / mapMeters) * canvas.height;
               
               if (isHit) {
                   const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
+                  const rPx = (fs.disp / mapMeters) * canvas.width;
+                  
+                  ctx.beginPath();
                   ctx.setLineDash(blinkOn ? [] : [2, 4]); 
-                  ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
+                  ctx.arc(tOrigPx, tOrigPy, Math.max(1, rPx), 0, 2 * Math.PI);
                   ctx.strokeStyle = '#ffbb00';
                   ctx.lineWidth = blinkOn ? 3 : 1; 
                   ctx.stroke();
@@ -594,36 +621,26 @@ function App() {
                       ctx.fillStyle = '#ffbb0080';
                       ctx.fill();
                   }
-              } else {
-                  ctx.setLineDash([2, 4]); 
-                  ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
-                  ctx.strokeStyle = '#ffbb00';
-                  ctx.lineWidth = 1;
-                  ctx.stroke();
+                  ctx.setLineDash([]);
+              } else if (progress >= 0 && progress <= 1) {
+                  const currentPx = gunPos.px + (tOrigPx - gunPos.px) * progress;
+                  const currentPy = gunPos.py + (tOrigPy - gunPos.py) * progress;
+                  
+                  const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
+                  ctx.beginPath();
+                  ctx.arc(currentPx, currentPy, 4, 0, 2 * Math.PI);
+                  if (blinkOn) {
+                      ctx.fillStyle = '#ffbb00';
+                      ctx.fill();
+                  } else {
+                      ctx.strokeStyle = '#ffbb00';
+                      ctx.lineWidth = 2;
+                      ctx.stroke();
+                  }
               }
-              
-              ctx.setLineDash([]);
-              ctx.lineWidth = 1;
-          }
-          
-          if (fireStart !== null && progress >= 0 && progress <= 1 && !isHit) {
-              const currentPx = gunPos.px + (activeTgtPos.px - gunPos.px) * progress;
-              const currentPy = gunPos.py + (activeTgtPos.py - gunPos.py) * progress;
-              
-              const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
-              ctx.beginPath();
-              ctx.arc(currentPx, currentPy, 4, 0, 2 * Math.PI);
-              if (blinkOn) {
-                  ctx.fillStyle = '#ffbb00';
-                  ctx.fill();
-              } else {
-                  ctx.strokeStyle = '#ffbb00';
-                  ctx.lineWidth = 2;
-                  ctx.stroke();
-              }
-          }
+          });
       }
-  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStart]);
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!mapMode) return;
@@ -646,13 +663,44 @@ function App() {
           setGunX(coordX.toString());
           setGunY(coordY.toString());
           setMapMode(null);
-          setFireStart(null);
+          
       } else if (mapMode === 'tgt') {
           setTgtX(coordX.toString());
           setTgtY(coordY.toString());
           setMapMode(null);
-          setFireStart(null);
+          
       }
+      setCursorPos(null);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!mapMode) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const xPx = e.clientX - rect.left;
+      const yPx = e.clientY - rect.top;
+      
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = xPx * scaleX;
+      const py = yPx * scaleY;
+      
+      const mapMeters = mapSize * 1000;
+      let coordX = Math.round((px / canvas.width) * mapMeters);
+      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters);
+      
+      coordX = Math.max(0, coordX);
+      coordY = Math.max(0, coordY);
+
+      const xStr = coordX.toString().padStart(4, '0').slice(-4);
+      const yStr = coordY.toString().padStart(4, '0').slice(-4);
+
+      setCursorPos({
+          clientPx: xPx,
+          clientPy: yPx,
+          coord: `${xStr} ${yStr}`
+      });
   };
 
   const handleAdjust = (dir: 'N' | 'S' | 'E' | 'W') => {
@@ -677,7 +725,7 @@ function App() {
       else if (xOffset < 0) { setAdjE(''); setAdjW(Math.abs(xOffset).toString()); }
       else { setAdjE(''); setAdjW(''); }
       
-      setFireStart(null);
+      
   };
 
   const handleGridAdjust = (type: 'gun' | 'tgt', dir: 'N' | 'S' | 'E' | 'W') => {
@@ -705,7 +753,7 @@ function App() {
           setTgtX(newX);
           setTgtY(newY);
       }
-      setFireStart(null);
+      
   };
 
   const handleResetAdjust = () => {
@@ -713,35 +761,56 @@ function App() {
       setAdjS('');
       setAdjE('');
       setAdjW('');
-      setFireStart(null);
+      
   };
 
   const handleFire = () => {
-    if (calculation.valid) {
-      setFireStart(Date.now());
+    if (calculation.valid && calculation.tof) {
+      let t_x = parseGridPiece(tgtX);
+      let t_y = parseGridPiece(tgtY);
+      const isAdjusted = (parseFloat(adjN||'0') !== 0 || parseFloat(adjS||'0') !== 0 || parseFloat(adjE||'0') !== 0 || parseFloat(adjW||'0') !== 0);
+      if (isAdjusted && t_x !== null && t_y !== null) {
+          t_x += parseFloat(adjE || '0') - parseFloat(adjW || '0');
+          t_y += parseFloat(adjN || '0') - parseFloat(adjS || '0');
+      }
+
+      setFireStarts(prev => [...prev, {
+          id: Date.now(),
+          start: Date.now(),
+          tof: calculation.tof,
+          tx: t_x || 0,
+          ty: t_y || 0,
+          disp: calculation.dispersion || 0
+      }]);
       setNow(Date.now());
     }
   };
 
   let timerRender = null;
-  if (fireStart !== null && calculation.valid && calculation.tof) {
-    const elapsed = (now - fireStart) / 1000;
-    const remaining = calculation.tof - elapsed;
-
-    if (remaining > 0) {
+  if (fireStarts.length > 0) {
       timerRender = (
-         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px', background: 'var(--term-bg)', border: '1px dashed var(--term-border)', color: 'var(--term-fg)', fontSize: '14px', zIndex: 10 }}>
-             T - {remaining.toFixed(1)}
-         </div>
+          <div style={{ position: 'absolute', bottom: '15px', right: '15px', display: 'flex', flexDirection: 'column', gap: '5px', zIndex: 10 }}>
+              {fireStarts.map((fs) => {
+                  const elapsed = (now - fs.start) / 1000;
+                  const remaining = fs.tof - elapsed;
+                  if (remaining > 0) {
+                      return (
+                          <div key={fs.id} style={{ padding: '5px', background: 'var(--term-bg)', border: '1px dashed var(--term-border)', color: 'var(--term-fg)', fontSize: '14px', textAlign: 'right' }}>
+                              T - {remaining.toFixed(1)}
+                          </div>
+                      );
+                  } else if (remaining > -3) {
+                      const blinkOn = Math.floor(Date.now() / 250) % 2 === 0;
+                      return (
+                          <div key={fs.id} style={{ padding: '5px 10px', background: blinkOn ? '#ffbb00' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ffbb00', border: '1px solid #ffbb00', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
+                              SPLASH
+                          </div>
+                      );
+                  }
+                  return null;
+              })}
+          </div>
       );
-    } else if (remaining > -3) {
-      const blinkOn = Math.floor(Date.now() / 250) % 2 === 0;
-      timerRender = (
-         <div style={{ position: 'absolute', bottom: '15px', right: '15px', padding: '5px 10px', background: blinkOn ? '#ffbb00' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ffbb00', border: '1px solid #ffbb00', fontSize: '14px', fontWeight: 'bold', zIndex: 10 }}>
-             SPLASH
-         </div>
-      );
-    }
   }
 
   const adjNS = adjN ? `N ${adjN}` : (adjS ? `S ${adjS}` : '');
@@ -776,7 +845,7 @@ function App() {
                         value={gunX}
                         onChange={(e) => {
                             setGunX(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -787,7 +856,7 @@ function App() {
                         value={gunY}
                         onChange={(e) => {
                             setGunY(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -803,7 +872,7 @@ function App() {
                         value={tgtX}
                         onChange={(e) => {
                             setTgtX(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -814,7 +883,7 @@ function App() {
                         value={tgtY}
                         onChange={(e) => {
                             setTgtY(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -831,7 +900,7 @@ function App() {
                         value={gunElevStr}
                         onChange={(e) => {
                             setGunElevStr(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -848,7 +917,7 @@ function App() {
                         value={tgtElevStr}
                         onChange={(e) => {
                             setTgtElevStr(e.target.value);
-                            setFireStart(null);
+                            
                         }}
                     />
                 </div>
@@ -863,7 +932,7 @@ function App() {
                         value={forcedCharge === null ? 'AUTO' : forcedCharge.toString()}
                         onChange={(e) => {
                             setForcedCharge(e.target.value === 'AUTO' ? null : parseInt(e.target.value));
-                            setFireStart(null);
+                            
                         }}
                         style={{
                             flex: 1,
@@ -943,38 +1012,75 @@ function App() {
 
       {activePage === 'MAP' && (
           <div className="map-page map-responsive-wrapper">
-             <div className="map-canvas-container">
+             <div className="map-canvas-container" style={{ position: 'relative' }}>
                  <canvas 
                      ref={canvasRef} 
                      width={800} 
                      height={800} 
                      onClick={handleCanvasClick} 
+                     onMouseMove={handleCanvasMouseMove}
+                     onMouseLeave={() => setCursorPos(null)}
                      style={{ 
                          border: '1px solid var(--term-border)',
                          width: '100%',
                          height: '100%',
                          display: 'block',
-                         cursor: mapMode ? 'crosshair' : 'default'
+                         cursor: mapMode ? 'none' : 'default',
+                         position: 'relative',
+                         zIndex: 1
                      }} 
                  />
+
+                 {mapMode && cursorPos && (
+                     <div style={{
+                         position: 'absolute',
+                         left: cursorPos.clientPx, 
+                         top: cursorPos.clientPy, 
+                         pointerEvents: 'none',
+                         zIndex: 50,
+                     }}>
+                         <div style={{ position: 'absolute', left: '-20px', top: '0', width: '40px', height: '1px', background: 'var(--term-fg)' }} />
+                         <div style={{ position: 'absolute', left: '0', top: '-20px', width: '1px', height: '40px', background: 'var(--term-fg)' }} />
+                         <div style={{ position: 'absolute', left: '8px', top: '10px', whiteSpace: 'nowrap', color: 'var(--term-fg)', fontSize: '12px', textShadow: '0 0 2px black', fontWeight: 'bold' }}>
+                             {cursorPos.coord}
+                         </div>
+                     </div>
+                 )}
                  
-                 {showMapSizeInput && (
-                      <div style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 12, backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
-                          <input 
-                              type="number" 
-                              value={mapSize} 
-                              onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
-                              style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
-                          />
-                          <span style={{ fontSize: '12px' }}>KM</span>
-                      </div>
-                  )}
+                 <div style={{ position: 'absolute', top: '15px', left: '15px', display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none', zIndex: 12 }}>
+                     {showMapSizeInput && (
+                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
+                              <input 
+                                  type="number" 
+                                  value={mapSize} 
+                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
+                              />
+                              <span style={{ fontSize: '12px' }}>KM</span>
+                          </div>
+                     )}
+                     
+                     {showCoordsInput && (
+                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '12px', width: '30px' }}>GUN:</span>
+                                  <input type="text" value={gunX} onChange={e => setGunX(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="X" />
+                                  <input type="text" value={gunY} onChange={e => setGunY(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="Y" />
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '12px', width: '30px' }}>TGT:</span>
+                                  <input type="text" value={tgtX} onChange={e => setTgtX(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="X" />
+                                  <input type="text" value={tgtY} onChange={e => setTgtY(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="Y" />
+                              </div>
+                          </div>
+                      )}
+                 </div>
                  
                  {timerRender}
 
                  {showBDT && (
-                      <div style={{ position: 'absolute', bottom: bdtPosition === 'bottom-left' ? '15px' : undefined, top: bdtPosition === 'top-left' ? '50px' : undefined, left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
+                      <div style={{ position: 'absolute', bottom: bdtPosition === 'bottom-left' ? '15px' : undefined, top: bdtPosition === 'top-left' ? '120px' : undefined, left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
                           {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
                               <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
                           )}
@@ -1049,6 +1155,32 @@ function App() {
         <div className="mfd-sidebar right">
             {activePage === 'MAP' ? (
                 <>
+                    {/* Top Group */}
+                    <button
+                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
+                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
+                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
+                    >
+                        {showMapSizeInput ? 'HIDE SIZE' : 'MAP SIZE'}
+                    </button>
+                    <button
+                        className={`osb-button ${showDPad ? 'active' : ''}`}
+                        onClick={() => setShowDPad(!showDPad)}
+                        style={{ borderStyle: showDPad ? 'solid' : 'dashed' }}
+                    >
+                        {showDPad ? 'HIDE DPAD' : 'SHOW DPAD'}
+                    </button>
+                    <button
+                        className={`osb-button ${showBDT ? 'active' : ''}`}
+                        onClick={() => setShowBDT(!showBDT)}
+                        style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
+                    >
+                        {showBDT ? 'HIDE BDT' : 'SHOW BDT'}
+                    </button>
+
+                    <div style={{ flex: 1 }} />
+
+                    {/* Center Group */}
                     <button
                         className={`osb-button ${mapMode === 'gun' ? 'active' : ''}`}
                         onClick={() => setMapMode('gun')}
@@ -1063,34 +1195,29 @@ function App() {
                     >
                         {mapMode === 'tgt' ? 'SETN TGT' : 'SET TGT'}
                     </button>
-                    {(adjN || adjS || adjE || adjW) && (
+                    <button
+                        className={`osb-button ${showCoordsInput ? 'active' : ''}`}
+                        onClick={() => setShowCoordsInput(!showCoordsInput)}
+                        style={{ borderStyle: showCoordsInput ? 'solid' : 'dashed' }}
+                    >
+                        {showCoordsInput ? 'HIDE COORDS' : 'COORDS'}
+                    </button>
+
+                    <div style={{ flex: 1 }} />
+
+                    {/* Bottom Group */}
+                    {(adjN || adjS || adjE || adjW) ? (
                         <button className="osb-button" onClick={handleCommitAdj}>
                             COMMIT<br/>ADJ
                         </button>
+                    ) : null}
+                    
+                    {calculation.valid && fireStarts.length > 0 && (
+                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={handleFire}>
+                            + ROUND
+                        </button>
                     )}
-                    <button
-                        className={`osb-button ${showDPad ? 'active' : ''}`}
-                        onClick={() => setShowDPad(!showDPad)}
-                        style={{ borderStyle: showDPad ? 'solid' : 'dashed' }}
-                    >
-                        {showDPad ? 'HIDE DPAD' : 'SHOW DPAD'}
-                    </button>
-                    <button
-                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
-                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
-                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
-                    >
-                        {showMapSizeInput ? 'HIDE SIZE' : 'MAP SIZE'}
-                    </button>
-                    <button
-                        className={`osb-button ${showBDT ? 'active' : ''}`}
-                        onClick={() => setShowBDT(!showBDT)}
-                        style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
-                    >
-                        {showBDT ? 'HIDE BDT' : 'SHOW BDT'}
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    {calculation.valid && fireStart === null && (
+                    {calculation.valid && (
                         <button className="osb-button" onClick={handleFire}>
                             FIRE
                         </button>
@@ -1104,7 +1231,12 @@ function App() {
                         </button>
                     )}
                     <div style={{ flex: 1 }} />
-                    {calculation.valid && fireStart === null && (
+                    {calculation.valid && fireStarts.length > 0 && (
+                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={handleFire}>
+                            + ROUND
+                        </button>
+                    )}
+                    {calculation.valid && (
                         <button className="osb-button" onClick={handleFire}>
                             FIRE
                         </button>
