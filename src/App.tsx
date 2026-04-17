@@ -253,12 +253,15 @@ function App() {
   const [forcedCharge, setForcedCharge] = useState<number | null>(null);
   
   const [mapSize, setMapSize] = useState<number>(8);
+  const [mapOriginX, setMapOriginX] = useState<number>(0);
+  const [mapOriginY, setMapOriginY] = useState<number>(0);
   const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
 
   const [showDPad, setShowDPad] = useState<boolean>(true);
   const [showBDT, setShowBDT] = useState<boolean>(true);
   const [bdtPosition, setBdtPosition] = useState<'bottom-left' | 'top-left'>('bottom-left');
-  const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
+  const [zoomMode, setZoomMode] = useState<'OFF' | '1X' | '2X' | '3X' | 'FIT'>('OFF');
+  const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
   const [showCoordsInput, setShowCoordsInput] = useState<boolean>(false);
   const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('MAP');
@@ -441,12 +444,16 @@ function App() {
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]); 
       ctx.beginPath();
-      for (let i = 0; i <= mapSize * 10; i++) {
-          if (i % 10 === 0) continue; // Skip the 1km major lines
-          const px = Math.floor((i * 100 / mapMeters) * canvas.width) + 0.5;
+      const start100X = Math.floor(mapOriginX / 100) * 100;
+      const start100Y = Math.floor(mapOriginY / 100) * 100;
+      for (let x = start100X; x <= mapOriginX + mapMeters; x += 100) {
+          if (x % 1000 === 0) continue;
+          const px = Math.floor(((x - mapOriginX) / mapMeters) * canvas.width) + 0.5;
           ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
-          
-          const py = Math.floor(canvas.height - (i * 100 / mapMeters) * canvas.height) + 0.5;
+      }
+      for (let y = start100Y; y <= mapOriginY + mapMeters; y += 100) {
+          if (y % 1000 === 0) continue;
+          const py = Math.floor(canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height) + 0.5;
           ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
       }
       ctx.stroke();
@@ -456,11 +463,14 @@ function App() {
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]);
       ctx.beginPath();
-      for (let i = 0; i <= mapSize; i++) {
-          const px = Math.floor((i * 1000 / mapMeters) * canvas.width) + 0.5;
+      const start1000X = Math.floor(mapOriginX / 1000) * 1000;
+      const start1000Y = Math.floor(mapOriginY / 1000) * 1000;
+      for (let x = start1000X; x <= mapOriginX + mapMeters; x += 1000) {
+          const px = Math.floor(((x - mapOriginX) / mapMeters) * canvas.width) + 0.5;
           ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
-          
-          const py = Math.floor(canvas.height - (i * 1000 / mapMeters) * canvas.height) + 0.5;
+      }
+      for (let y = start1000Y; y <= mapOriginY + mapMeters; y += 1000) {
+          const py = Math.floor(canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height) + 0.5;
           ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
       }
       ctx.stroke();
@@ -469,17 +479,19 @@ function App() {
       // Labels
       ctx.fillStyle = '#ffbb00';
       ctx.font = '10px monospace';
-      for (let i = 0; i <= mapSize; i++) {
-          const px = (i * 1000 / mapMeters) * canvas.width;
-          ctx.fillText((i).toString().padStart(2,'0'), px + 2, canvas.height - 2);
-          const py = canvas.height - (i * 1000 / mapMeters) * canvas.height;
-          if (i > 0) ctx.fillText((i).toString().padStart(2,'0'), 2, py - 2);
+      for (let x = start1000X; x <= mapOriginX + mapMeters; x += 1000) {
+          const px = ((x - mapOriginX) / mapMeters) * canvas.width;
+          if (x >= 0) ctx.fillText((Math.floor(x/1000) % 100).toString().padStart(2,'0'), px + 2, canvas.height - 2);
+      }
+      for (let y = start1000Y; y <= mapOriginY + mapMeters; y += 1000) {
+          const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
+          if (y >= 0 && py < canvas.height - 10) ctx.fillText((Math.floor(y/1000) % 100).toString().padStart(2,'0'), 2, py - 2);
       }
 
       const drawPoint = (x: number | null, y: number | null, label: string) => {
           if (x === null || y === null) return null;
-          const px = (x / mapMeters) * canvas.width;
-          const py = canvas.height - (y / mapMeters) * canvas.height;
+          const px = ((x - mapOriginX) / mapMeters) * canvas.width;
+          const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
           
           ctx.strokeStyle = '#ffbb00';
           ctx.lineWidth = 1;
@@ -604,8 +616,8 @@ function App() {
               const progress = elapsed / fs.tof;
               const isHit = progress >= 1;
               
-              const tOrigPx = (fs.tx / mapMeters) * canvas.width;
-              const tOrigPy = canvas.height - (fs.ty / mapMeters) * canvas.height;
+              const tOrigPx = ((fs.tx - mapOriginX) / mapMeters) * canvas.width;
+              const tOrigPy = canvas.height - ((fs.ty - mapOriginY) / mapMeters) * canvas.height;
               
               if (isHit) {
                   const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
@@ -640,7 +652,7 @@ function App() {
               }
           });
       }
-  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts]);
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!mapMode) return;
@@ -656,17 +668,22 @@ function App() {
       const py = yPx * scaleY;
       
       const mapMeters = mapSize * 1000;
-      const coordX = Math.round((px / canvas.width) * mapMeters);
-      const coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters);
+      let coordX = Math.round((px / canvas.width) * mapMeters) + mapOriginX;
+      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY;
+      
+      coordX = Math.max(0, coordX);
+      coordY = Math.max(0, coordY);
+      const xStr = coordX.toString().padStart(4, '0');
+      const yStr = coordY.toString().padStart(4, '0');
       
       if (mapMode === 'gun') {
-          setGunX(coordX.toString());
-          setGunY(coordY.toString());
+          setGunX(xStr);
+          setGunY(yStr);
           setMapMode(null);
           
       } else if (mapMode === 'tgt') {
-          setTgtX(coordX.toString());
-          setTgtY(coordY.toString());
+          setTgtX(xStr);
+          setTgtY(yStr);
           setMapMode(null);
           
       }
@@ -687,20 +704,92 @@ function App() {
       const py = yPx * scaleY;
       
       const mapMeters = mapSize * 1000;
-      let coordX = Math.round((px / canvas.width) * mapMeters);
-      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters);
+      let coordX = Math.round((px / canvas.width) * mapMeters) + mapOriginX;
+      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY;
       
       coordX = Math.max(0, coordX);
       coordY = Math.max(0, coordY);
 
-      const xStr = coordX.toString().padStart(4, '0').slice(-4);
-      const yStr = coordY.toString().padStart(4, '0').slice(-4);
+      const xStr = coordX.toString().padStart(4, '0');
+      const yStr = coordY.toString().padStart(4, '0');
 
       setCursorPos({
           clientPx: xPx,
           clientPy: yPx,
           coord: `${xStr} ${yStr}`
       });
+  };
+
+  const handleZoomFit = () => {
+      let gx = parseGridPiece(gunX);
+      let gy = parseGridPiece(gunY);
+      let tx = parseGridPiece(tgtX);
+      let ty = parseGridPiece(tgtY);
+      
+      if (gx === null && tx === null) return;
+      
+      let minX = Math.min(gx !== null ? gx : tx!, tx !== null ? tx : gx!);
+      let maxX = Math.max(gx !== null ? gx : tx!, tx !== null ? tx : gx!);
+      let minY = Math.min(gy !== null ? gy : ty!, ty !== null ? ty : gy!);
+      let maxY = Math.max(gy !== null ? gy : ty!, ty !== null ? ty : gy!);
+
+      // Padding wiggle room ~500m around bounds
+      minX = Math.max(0, minX - 500);
+      minY = Math.max(0, minY - 500);
+      maxX += 500;
+      maxY += 500;
+
+      const deltaX = maxX - minX;
+      const deltaY = maxY - minY;
+      const reqMeters = Math.max(deltaX, deltaY, 1000);
+      
+      const newMapSize = Math.ceil(reqMeters / 1000);
+      setMapSize(newMapSize);
+      setZoomMode('FIT');
+      
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      setMapOriginX(Math.max(0, centerX - (newMapSize * 1000) / 2));
+      setMapOriginY(Math.max(0, centerY - (newMapSize * 1000) / 2));
+  };
+  
+  const handleCycleZoom = () => {
+      const centerX = mapOriginX + (mapSize * 1000) / 2;
+      const centerY = mapOriginY + (mapSize * 1000) / 2;
+
+      let nextMode: 'OFF' | '1X' | '2X' | '3X' = 'OFF';
+      let nextSize = 8;
+      
+      if (zoomMode === 'OFF' || zoomMode === 'FIT') {
+          nextMode = '1X'; nextSize = 4;
+      } else if (zoomMode === '1X') {
+          nextMode = '2X'; nextSize = 2;
+      } else if (zoomMode === '2X') {
+          nextMode = '3X'; nextSize = 1;
+      } else {
+          nextMode = 'OFF'; nextSize = 8;
+      }
+
+      setZoomMode(nextMode);
+      setMapSize(nextSize);
+      
+      if (nextMode === 'OFF') {
+          setMapOriginX(0);
+          setMapOriginY(0);
+      } else {
+          setMapOriginX(Math.max(0, centerX - (nextSize * 1000) / 2));
+          setMapOriginY(Math.max(0, Math.max(0, centerY - (nextSize * 1000) / 2))); // ensure > 0
+      }
+  };
+
+  const handlePan = (dir: 'N' | 'S' | 'E' | 'W') => {
+      if (zoomMode === 'OFF') return;
+      const step = (mapSize * 1000) * 0.25; 
+      if (dir === 'N') setMapOriginY(prev => Math.max(0, prev + step));
+      if (dir === 'S') setMapOriginY(prev => Math.max(0, prev - step));
+      if (dir === 'E') setMapOriginX(prev => Math.max(0, prev + step));
+      if (dir === 'W') setMapOriginX(prev => Math.max(0, prev - step));
   };
 
   const handleAdjust = (dir: 'N' | 'S' | 'E' | 'W') => {
@@ -1048,19 +1137,7 @@ function App() {
                  )}
                  
                  <div style={{ position: 'absolute', top: '15px', left: '15px', display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none', zIndex: 12 }}>
-                     {showMapSizeInput && (
-                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
-                              <input 
-                                  type="number" 
-                                  value={mapSize} 
-                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
-                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
-                              />
-                              <span style={{ fontSize: '12px' }}>KM</span>
-                          </div>
-                     )}
-                     
+
                      {showCoordsInput && (
                           <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1097,55 +1174,70 @@ function App() {
 
              {showDPad && (
                  <div className="dpads-sidebar">
-                     
-                     {/* GUN D-PAD */}
-                     <div className="dpad-item">
-                         <span className="dpad-item-title">GUN POS</span>
+                     <div className="dpad-item" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
+                         <button 
+                             style={{ background: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', cursor: 'pointer', fontSize: '10px', width: '100px', marginBottom: '8px', padding: '4px' }}
+                             onClick={() => {
+                                 if (dpadMode === 'TGT') setDpadMode('GUN');
+                                 else if (dpadMode === 'GUN') setDpadMode('ADJUST');
+                                 else if (dpadMode === 'ADJUST') setDpadMode('PAN');
+                                 else setDpadMode('TGT');
+                             }}
+                         >
+                             MODE: {dpadMode === 'PAN' && zoomMode === 'OFF' ? 'PAN (N/A)' : dpadMode}
+                         </button>
                          <div className="dpad-grid">
                              <div />
-                             <RepeatButton onClick={() => handleGridAdjust('gun', 'N')} className="dpad-btn">▲</RepeatButton>
+                             <RepeatButton 
+                                className="dpad-btn"
+                                onClick={() => {
+                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'N');
+                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N');
+                                    else if (dpadMode === 'ADJUST') handleAdjust('N');
+                                    else if (dpadMode === 'PAN') handlePan('N');
+                                }}
+                             >▲</RepeatButton>
                              <div />
-                             <RepeatButton onClick={() => handleGridAdjust('gun', 'W')} className="dpad-btn">◀</RepeatButton>
+                             
+                             <RepeatButton 
+                                className="dpad-btn"
+                                onClick={() => {
+                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'W');
+                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W');
+                                    else if (dpadMode === 'ADJUST') handleAdjust('W');
+                                    else if (dpadMode === 'PAN') handlePan('W');
+                                }}
+                             >◀</RepeatButton>
+                             
+                             {dpadMode === 'ADJUST' ? (
+                                <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0 }}>⨯</button>
+                             ) : (
+                                <div />
+                             )}
+                             
+                             <RepeatButton 
+                                className="dpad-btn"
+                                onClick={() => {
+                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'E');
+                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E');
+                                    else if (dpadMode === 'ADJUST') handleAdjust('E');
+                                    else if (dpadMode === 'PAN') handlePan('E');
+                                }}
+                             >▶</RepeatButton>
                              <div />
-                             <RepeatButton onClick={() => handleGridAdjust('gun', 'E')} className="dpad-btn">▶</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleGridAdjust('gun', 'S')} className="dpad-btn">▼</RepeatButton>
+                             
+                             <RepeatButton 
+                                className="dpad-btn"
+                                onClick={() => {
+                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'S');
+                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S');
+                                    else if (dpadMode === 'ADJUST') handleAdjust('S');
+                                    else if (dpadMode === 'PAN') handlePan('S');
+                                }}
+                             >▼</RepeatButton>
                              <div />
                          </div>
                      </div>
-
-                     {/* TARGET D-PAD */}
-                     <div className="dpad-item">
-                         <span className="dpad-item-title">TGT POS</span>
-                         <div className="dpad-grid">
-                             <div />
-                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'N')} className="dpad-btn">▲</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'W')} className="dpad-btn">◀</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'E')} className="dpad-btn">▶</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleGridAdjust('tgt', 'S')} className="dpad-btn">▼</RepeatButton>
-                             <div />
-                         </div>
-                     </div>
-                     
-                     {/* ADJUSTMENT D-PAD */}
-                     <div className="dpad-item">
-                         <span className="dpad-item-title">ADJUST</span>
-                         <div className="dpad-grid">
-                             <div />
-                             <RepeatButton onClick={() => handleAdjust('N')} className="dpad-btn">▲</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleAdjust('W')} className="dpad-btn">◀</RepeatButton>
-                             <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset">⨯</button>
-                             <RepeatButton onClick={() => handleAdjust('E')} className="dpad-btn">▶</RepeatButton>
-                             <div />
-                             <RepeatButton onClick={() => handleAdjust('S')} className="dpad-btn">▼</RepeatButton>
-                             <div />
-                         </div>
-                     </div>
-
                  </div>
              )}
           </div>
@@ -1157,25 +1249,32 @@ function App() {
                 <>
                     {/* Top Group */}
                     <button
-                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
-                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
-                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
+                        className="osb-button"
+                        onClick={handleCycleZoom}
+                        style={{ borderStyle: 'solid' }}
                     >
-                        {showMapSizeInput ? 'HIDE SIZE' : 'MAP SIZE'}
+                        ZOOM: {zoomMode}
                     </button>
                     <button
                         className={`osb-button ${showDPad ? 'active' : ''}`}
                         onClick={() => setShowDPad(!showDPad)}
                         style={{ borderStyle: showDPad ? 'solid' : 'dashed' }}
                     >
-                        {showDPad ? 'HIDE DPAD' : 'SHOW DPAD'}
+                        DPAD
                     </button>
                     <button
                         className={`osb-button ${showBDT ? 'active' : ''}`}
                         onClick={() => setShowBDT(!showBDT)}
                         style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
                     >
-                        {showBDT ? 'HIDE BDT' : 'SHOW BDT'}
+                        BDT
+                    </button>
+                    <button
+                        className={`osb-button ${showCoordsInput ? 'active' : ''}`}
+                        onClick={() => setShowCoordsInput(!showCoordsInput)}
+                        style={{ borderStyle: showCoordsInput ? 'solid' : 'dashed' }}
+                    >
+                        COORDS
                     </button>
 
                     <div style={{ flex: 1 }} />
@@ -1186,31 +1285,30 @@ function App() {
                         onClick={() => setMapMode('gun')}
                         style={{ borderStyle: mapMode === 'gun' ? 'solid' : 'dashed' }}
                     >
-                        {mapMode === 'gun' ? 'SETN GUN' : 'SET GUN'}
+                        SET GUN
                     </button>
                     <button
                         className={`osb-button ${mapMode === 'tgt' ? 'active' : ''}`}
                         onClick={() => setMapMode('tgt')}
                         style={{ borderStyle: mapMode === 'tgt' ? 'solid' : 'dashed' }}
                     >
-                        {mapMode === 'tgt' ? 'SETN TGT' : 'SET TGT'}
+                        SET TGT
                     </button>
                     <button
-                        className={`osb-button ${showCoordsInput ? 'active' : ''}`}
-                        onClick={() => setShowCoordsInput(!showCoordsInput)}
-                        style={{ borderStyle: showCoordsInput ? 'solid' : 'dashed' }}
+                        className="osb-button"
+                        onClick={handleZoomFit}
                     >
-                        {showCoordsInput ? 'HIDE COORDS' : 'COORDS'}
+                        FIT ZOOM
                     </button>
-
-                    <div style={{ flex: 1 }} />
-
-                    {/* Bottom Group */}
                     {(adjN || adjS || adjE || adjW) ? (
                         <button className="osb-button" onClick={handleCommitAdj}>
                             COMMIT<br/>ADJ
                         </button>
                     ) : null}
+
+                    <div style={{ flex: 1 }} />
+
+                    {/* Bottom Group */}
                     
                     {calculation.valid && fireStarts.length > 0 && (
                         <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={handleFire}>
