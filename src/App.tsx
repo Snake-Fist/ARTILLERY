@@ -260,7 +260,8 @@ function App() {
   const [showDPad, setShowDPad] = useState<boolean>(true);
   const [showBDT, setShowBDT] = useState<boolean>(true);
   const [bdtPosition, setBdtPosition] = useState<'bottom-left' | 'top-left'>('bottom-left');
-  const [zoomMode, setZoomMode] = useState<'OFF' | '1X' | '2X' | '3X' | 'FIT'>('OFF');
+  const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
+  const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
   const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
   const [showCoordsInput, setShowCoordsInput] = useState<boolean>(false);
   const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
@@ -758,15 +759,15 @@ function App() {
       const centerX = mapOriginX + (mapSize * 1000) / 2;
       const centerY = mapOriginY + (mapSize * 1000) / 2;
 
-      let nextMode: 'OFF' | '1X' | '2X' | '3X' = 'OFF';
+      let nextMode: 'OFF' | '2X' | '4X' | '8X' = 'OFF';
       let nextSize = 8;
       
       if (zoomMode === 'OFF' || zoomMode === 'FIT') {
-          nextMode = '1X'; nextSize = 4;
-      } else if (zoomMode === '1X') {
-          nextMode = '2X'; nextSize = 2;
+          nextMode = '2X'; nextSize = 4;
       } else if (zoomMode === '2X') {
-          nextMode = '3X'; nextSize = 1;
+          nextMode = '4X'; nextSize = 2;
+      } else if (zoomMode === '4X') {
+          nextMode = '8X'; nextSize = 1;
       } else {
           nextMode = 'OFF'; nextSize = 8;
       }
@@ -1137,6 +1138,18 @@ function App() {
                  )}
                  
                  <div style={{ position: 'absolute', top: '15px', left: '15px', display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none', zIndex: 12 }}>
+                     {showMapSizeInput && (
+                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
+                              <input 
+                                  type="number" 
+                                  value={mapSize} 
+                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
+                              />
+                              <span style={{ fontSize: '12px' }}>KM</span>
+                          </div>
+                     )}
 
                      {showCoordsInput && (
                           <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1249,11 +1262,24 @@ function App() {
                 <>
                     {/* Top Group */}
                     <button
+                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
+                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
+                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
+                    >
+                        MAP SIZE
+                    </button>
+                    <button
                         className="osb-button"
                         onClick={handleCycleZoom}
                         style={{ borderStyle: 'solid' }}
                     >
                         ZOOM: {zoomMode}
+                    </button>
+                    <button
+                        className="osb-button"
+                        onClick={handleZoomFit}
+                    >
+                        FIT ZOOM
                     </button>
                     <button
                         className={`osb-button ${showDPad ? 'active' : ''}`}
@@ -1293,12 +1319,6 @@ function App() {
                         style={{ borderStyle: mapMode === 'tgt' ? 'solid' : 'dashed' }}
                     >
                         SET TGT
-                    </button>
-                    <button
-                        className="osb-button"
-                        onClick={handleZoomFit}
-                    >
-                        FIT ZOOM
                     </button>
                     {(adjN || adjS || adjE || adjW) ? (
                         <button className="osb-button" onClick={handleCommitAdj}>
