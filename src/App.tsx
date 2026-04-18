@@ -10,8 +10,6 @@ import keyIn2Snd from './assets/key-in-2.wav';
 import keyOut2Snd from './assets/key-out-2.wav';
 import keyIn3Snd from './assets/key-in-3.wav';
 import keyOut3Snd from './assets/key-out-3.wav';
-import keyIn4Snd from './assets/key-in-4.wav';
-import keyOut4Snd from './assets/key-out-4.wav';
 
 // M107 HE Ballistic Data for Charges 1-5
 const CHARGES = [
@@ -259,8 +257,7 @@ function App() {
       keys: [
         { in: keyIn1Snd, out: keyOut1Snd },
         { in: keyIn2Snd, out: keyOut2Snd },
-        { in: keyIn3Snd, out: keyOut3Snd },
-        { in: keyIn4Snd, out: keyOut4Snd }
+        { in: keyIn3Snd, out: keyOut3Snd }
       ]
     };
     
