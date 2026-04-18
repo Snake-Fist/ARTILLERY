@@ -279,7 +279,7 @@ function App() {
       const text = btn.innerText.trim();
       let data: { type: 'enter'|'zero'|'key', index?: number };
       
-      if (text === 'ENT') {
+      if (text === '↓' || text.includes('COMMIT')) {
         playSnd(soundRegistry.enter.in);
         data = { type: 'enter' };
       } else if (text === '0') {
