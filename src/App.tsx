@@ -1273,7 +1273,7 @@ function App() {
                      ref={canvasRef} 
                      width={800} 
                      height={800} 
-                     onClick={handleCanvasClick} 
+                     onPointerDown={handleCanvasClick} 
                      onMouseMove={handleCanvasMouseMove}
                      onMouseLeave={() => setCursorPos(null)}
                      style={{ 
@@ -1464,7 +1464,7 @@ function App() {
                     )}
                     <button 
                         className="osb-button" 
-                        onClick={calculation.valid ? handleFire : undefined}
+                        onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
                         style={{
                             borderStyle: 'solid',
                             cursor: calculation.valid ? 'pointer' : 'not-allowed',
@@ -1492,7 +1492,7 @@ function App() {
                     )}
                     <button 
                         className="osb-button" 
-                        onClick={calculation.valid ? handleFire : undefined}
+                        onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
                         style={{
                             borderStyle: 'solid',
                             cursor: calculation.valid ? 'pointer' : 'not-allowed',

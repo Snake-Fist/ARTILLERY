@@ -216,9 +216,11 @@ button {
   margin-top: 15px;
 }
 
-button:hover {
-  background-color: var(--term-fg);
-  color: var(--term-bg);
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover {
+    background-color: var(--term-fg);
+    color: var(--term-bg);
+  }
 }
 
 button:active {
@@ -331,6 +333,9 @@ button:active {
   aspect-ratio: 1 / 1;
   overflow: hidden;
   flex-shrink: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dpads-sidebar {
