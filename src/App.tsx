@@ -2,14 +2,10 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import './index.css';
 import enterInSnd from './assets/enter-in.wav';
 import enterOutSnd from './assets/enter-out.wav';
-import keyIn1Snd from './assets/key-in-1.wav';
-import keyOut1Snd from './assets/key-out-1.wav';
 import keyIn2Snd from './assets/key-in-2.wav';
 import keyOut2Snd from './assets/key-out-2.wav';
 import keyIn3Snd from './assets/key-in-3.wav';
 import keyOut3Snd from './assets/key-out-3.wav';
-import keyIn4Snd from './assets/key-in-4.wav';
-import keyOut4Snd from './assets/key-out-4.wav';
 
 // M107 HE Ballistic Data for Charges 1-5
 const CHARGES = [
@@ -254,10 +250,8 @@ function App() {
     const soundRegistry = {
       enter: { in: enterInSnd, out: enterOutSnd },
       keys: [
-        { in: keyIn1Snd, out: keyOut1Snd },
         { in: keyIn2Snd, out: keyOut2Snd },
-        { in: keyIn3Snd, out: keyOut3Snd },
-        { in: keyIn4Snd, out: keyOut4Snd }
+        { in: keyIn3Snd, out: keyOut3Snd }
       ]
     };
     
@@ -276,7 +270,7 @@ function App() {
       const text = btn.innerText.trim();
       let data: { type: 'enter'|'zero'|'key', index?: number };
       
-      if (text === '↓' || text.includes('COMMIT')) {
+      if (text === '▶' || text.includes('COMMIT')) {
         playSnd(soundRegistry.enter.in);
         data = { type: 'enter' };
       } else {
@@ -589,9 +583,48 @@ function App() {
     if (!activeCharge && r > CHARGES[CHARGES.length - 1].max) return { valid: false, message: `OUT OF RANGE (MAX ${CHARGES[CHARGES.length - 1].max}M)` };
     if (!activeCharge) return { valid: false, message: 'NO CHARGE AVAILABLE FOR RANGE' };
 
+    let baseTofInfo = 0;
+    let lowerIndexBase = 0;
+    for (let i = 0; i < activeCharge.data.length; i++) {
+        if (activeCharge.data[i].range <= r) lowerIndexBase = i;
+    }
+    if (activeCharge.data[lowerIndexBase].range === r) {
+        baseTofInfo = activeCharge.data[lowerIndexBase].tof;
+    } else {
+        const upperIndex = lowerIndexBase + 1 < activeCharge.data.length ? lowerIndexBase + 1 : lowerIndexBase;
+        if (lowerIndexBase === upperIndex) {
+            baseTofInfo = activeCharge.data[lowerIndexBase].tof;
+        } else {
+            baseTofInfo = interpolate(r, activeCharge.data[lowerIndexBase].range, activeCharge.data[upperIndex].range, activeCharge.data[lowerIndexBase].tof, activeCharge.data[upperIndex].tof);
+        }
+    }
+
+    let effectiveRange = r;
+    let azFix = 0;
+    
+    const aerodynamicK = 0.37;
+    let wSpeed = parseFloat(windSpeed);
+    let wDir = parseFloat(windDir);
+    if (!isNaN(wSpeed) && !isNaN(wDir) && gridData) {
+        const azRad = (gridData.azimuth / 6400) * 2 * Math.PI;
+        const wDirRad = (wDir / 360) * 2 * Math.PI;
+        const relAngleRad = wDirRad - azRad;
+        
+        // Kestrel reads Wind FROM. To align physics, we invert the velocity matrix.
+        const tailwind = -wSpeed * Math.cos(relAngleRad);
+        const crosswind = -wSpeed * Math.sin(relAngleRad);
+        
+        const windRangeShift = tailwind * baseTofInfo * aerodynamicK;
+        effectiveRange = Math.max(0, r - windRangeShift);
+        
+        const crossOffset = crosswind * baseTofInfo * aerodynamicK;
+        const angularDeflectionRad = Math.atan2(crossOffset, r);
+        azFix = -angularDeflectionRad * (6400 / (2 * Math.PI));
+    }
+
     let lowerIndex = 0;
     for (let i = 0; i < activeCharge.data.length; i++) {
-        if (activeCharge.data[i].range <= r) {
+        if (activeCharge.data[i].range <= effectiveRange) {
             lowerIndex = i;
         }
     }
@@ -599,16 +632,21 @@ function App() {
     let baseElev = 0;
     let tof = 0;
 
-    if (activeCharge.data[lowerIndex].range === r) {
+    if (activeCharge.data[lowerIndex].range === effectiveRange) {
         baseElev = activeCharge.data[lowerIndex].elev;
         tof = activeCharge.data[lowerIndex].tof;
     } else {
-        const upperIndex = lowerIndex + 1;
+        const upperIndex = lowerIndex + 1 < activeCharge.data.length ? lowerIndex + 1 : lowerIndex;
         const lower = activeCharge.data[lowerIndex];
         const upper = activeCharge.data[upperIndex];
-
-        baseElev = interpolate(r, lower.range, upper.range, lower.elev, upper.elev);
-        tof = interpolate(r, lower.range, upper.range, lower.tof, upper.tof);
+        
+        if (lowerIndex === upperIndex) {
+            baseElev = lower.elev;
+            tof = lower.tof;
+        } else {
+            baseElev = interpolate(effectiveRange, lower.range, upper.range, lower.elev, upper.elev);
+            tof = interpolate(effectiveRange, lower.range, upper.range, lower.tof, upper.tof);
+        }
     }
 
     const gunElevAlt = parseFloat(gunElevStr);
@@ -656,12 +694,13 @@ function App() {
         charge: activeCharge.id,
         dispersion: activeCharge.dispersion,
         elev: finalElev,
-        tof: finalTof
+        tof: finalTof,
+        azFix: Math.round(azFix)
     };
     } catch (err: any) {
         return { valid: false, message: `CRASH: ${err.message}` };
     }
-  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, ]);
+  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, gridData, windSpeed, windDir]);
 
   useEffect(() => {
     setFireStarts(prev => prev.filter(fs => {
@@ -671,8 +710,9 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
 
-  const azMilStr = gridData ? gridData.azimuth.toString().padStart(4, '0') : '----';
-  const azDegStr = gridData ? (gridData.azimuth * (360 / 6400)).toFixed(1) : '--.-';
+  const finalAzimuth = (gridData && calculation.valid && calculation.azFix !== undefined) ? (gridData.azimuth + calculation.azFix + 6400) % 6400 : gridData?.azimuth;
+  const azMilStr = finalAzimuth !== undefined ? finalAzimuth.toString().padStart(4, '0') : '----';
+  const azDegStr = finalAzimuth !== undefined ? (finalAzimuth * (360 / 6400)).toFixed(1) : '--.-';
 
   const elMilStr = (calculation.valid && calculation.elev !== undefined) ? calculation.elev.toString().padStart(4, '0') : '----';
   const elDegStr = (calculation.valid && calculation.elev !== undefined) ? (calculation.elev * (360 / 6400)).toFixed(1) : '--.-';
