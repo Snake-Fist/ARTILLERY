@@ -471,3 +471,15 @@ button:active {
 .term-cursor-animate {
   animation: term-cursor-anim 1s step-end infinite;
 }
+
+/* Cancel Fire Button overlays */
+.btn-cancel-fire {
+  background: linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%);
+  color: var(--term-fg);
+}
+@media (hover: hover) and (pointer: fine) {
+  button.btn-cancel-fire:not(:disabled):hover {
+    background: var(--term-fg);
+    color: var(--term-bg);
+  }
+}

@@ -1464,9 +1464,9 @@ function App() {
                     )}
                     {fireStarts.length > 0 ? (
                         <button 
-                            className="osb-button" 
+                            className="osb-button btn-cancel-fire" 
                             onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
-                            style={{ borderStyle: 'solid', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
+                            style={{ borderStyle: 'solid' }}
                         >
                             <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
                         </button>
@@ -1502,9 +1502,9 @@ function App() {
                     )}
                     {fireStarts.length > 0 ? (
                         <button 
-                            className="osb-button" 
+                            className="osb-button btn-cancel-fire" 
                             onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
-                            style={{ borderStyle: 'solid', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
+                            style={{ borderStyle: 'solid' }}
                         >
                             <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
                         </button>
