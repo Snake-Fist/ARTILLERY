@@ -1082,7 +1082,6 @@ function App() {
       <div className="mfd-main">
         <div className="mfd-sidebar left">
             <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>MAP</button>
-            <button className={`osb-button ${activePage === 'COORDS' ? 'active' : ''}`} onClick={() => setActivePage('COORDS')}>COORDS</button>
             <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
         </div>
