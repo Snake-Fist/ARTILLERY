@@ -1466,7 +1466,7 @@ function App() {
                         <button 
                             className="osb-button" 
                             onClick={() => setFireStarts([])}
-                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', fontSize: '18px' }}
+                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
                         >
                             X
                         </button>
@@ -1504,7 +1504,7 @@ function App() {
                         <button 
                             className="osb-button" 
                             onClick={() => setFireStarts([])}
-                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', fontSize: '18px' }}
+                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
                         >
                             X
                         </button>
