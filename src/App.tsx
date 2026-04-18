@@ -246,6 +246,10 @@ const RepeatButton = ({ onClick, children, style, className }: any) => {
 };
 
 function App() {
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const soundEnabledRef = useRef(soundEnabled);
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+
   useEffect(() => {
     const soundRegistry = {
       enter: { in: enterInSnd, out: enterOutSnd },
@@ -258,6 +262,7 @@ function App() {
     const activeSounds = new Map<number, { type: 'enter'|'zero'|'key', index?: number }>();
     
     const playSnd = (src: string) => {
+      if (!soundEnabledRef.current) return;
       const audio = new Audio(src);
       audio.volume = 1.0;
       audio.play().catch(e => console.log('Audio playback prevented:', e));
@@ -436,7 +441,9 @@ function App() {
         if (activeField === 'windDir') setWindDir(updater);
         if (activeField === 'charge') setForcedChargeStr(updater);
       };
-      if (val === 'DEL') {
+      if (val === 'CLR') {
+          updateVal(() => '');
+      } else if (val === 'DEL') {
           updateVal(prev => prev.slice(0, -1));
       } else if (val === 'NEXT') {
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
@@ -1216,6 +1223,15 @@ function App() {
       <div className="mfd-main">
         <div className="mfd-sidebar left">
             <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>MAP</button>
+            {activePage === 'MAP' && (
+                <button
+                    className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
+                    onClick={() => setShowMapSizeInput(!showMapSizeInput)}
+                    style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
+                >
+                    MAP<br/>SIZE
+                </button>
+            )}
             <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
         </div>
@@ -1366,6 +1382,13 @@ function App() {
                           <button onClick={() => setTheme('WHITE')} className={`osb-button ${theme === 'WHITE' ? 'active' : ''}`} style={{ flex: 1 }}>WHITE</button>
                       </div>
                   </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ color: 'var(--term-fg)', opacity: 0.7 }}>TACTILE AUDIO:</div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => setSoundEnabled(true)} className={`osb-button ${soundEnabled ? 'active' : ''}`} style={{ flex: 1 }}>ON</button>
+                          <button onClick={() => setSoundEnabled(false)} className={`osb-button ${!soundEnabled ? 'active' : ''}`} style={{ flex: 1 }}>OFF</button>
+                      </div>
+                  </div>
               </div>
               <div style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '8px', opacity: 0.4, fontSize: '10px' }}>
                   M107 HE / M777A2 HOW / ARMA REFORGER MOD
@@ -1465,7 +1488,7 @@ function App() {
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('1')}>1</RepeatButton>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('2')}>2</RepeatButton>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('3')}>3</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('.')}>.</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('CLR')}>CLR</RepeatButton>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
                                  <button className="dpad-btn dpad-btn-reset" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('DEL')}>DEL</button>
                                  <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '18px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▶</button>
@@ -1515,13 +1538,6 @@ function App() {
             {activePage === 'MAP' ? (
                 <>
                     {/* Top Group */}
-                    <button
-                        className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
-                        onClick={() => setShowMapSizeInput(!showMapSizeInput)}
-                        style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
-                    >
-                        MAP SIZE
-                    </button>
                     <button
                         className="osb-button"
                         onClick={handleCycleZoom}
