@@ -258,12 +258,10 @@ function App() {
   const [mapOriginY, setMapOriginY] = useState<number>(0);
   const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
 
-  const [showDPad, setShowDPad] = useState<boolean>(true);
-  const [showBDT, setShowBDT] = useState<boolean>(true);
+  const [theme, setTheme] = useState<'AMBER' | 'GREEN' | 'RED' | 'WHITE'>('AMBER');
   const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
   const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
-  const [showCoordsInput, setShowCoordsInput] = useState<boolean>(false);
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('MAP');
   const [cursorPos, setCursorPos] = useState<{clientPx: number, clientPy: number, coord: string} | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -271,6 +269,27 @@ function App() {
   const [windSpeed, setWindSpeed] = useState<string>('');
   const [windDir, setWindDir] = useState<string>('');
   const [activeField, setActiveField] = useState<string | null>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'AMBER') {
+      root.style.setProperty('--term-bg', '#000000');
+      root.style.setProperty('--term-fg', '#ffb000');
+      root.style.setProperty('--term-border', '#ffb000');
+    } else if (theme === 'GREEN') {
+      root.style.setProperty('--term-bg', '#000000');
+      root.style.setProperty('--term-fg', '#33ff33');
+      root.style.setProperty('--term-border', '#33ff33');
+    } else if (theme === 'RED') {
+      root.style.setProperty('--term-bg', '#000000');
+      root.style.setProperty('--term-fg', '#ff3333');
+      root.style.setProperty('--term-border', '#ff3333');
+    } else if (theme === 'WHITE') {
+      root.style.setProperty('--term-bg', '#000000');
+      root.style.setProperty('--term-fg', '#f4f4f4');
+      root.style.setProperty('--term-border', '#f4f4f4');
+    }
+  }, [theme]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1222,7 +1241,16 @@ function App() {
               <div style={{ borderBottom: '1px dashed var(--term-border)', paddingBottom: '8px', fontSize: '11px', letterSpacing: '0.1em' }}>
                   SYSTEM CONFIGURATION
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '11px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ color: 'var(--term-fg)', opacity: 0.7 }}>UI COLOR THEME:</div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => setTheme('AMBER')} className={`osb-button ${theme === 'AMBER' ? 'active' : ''}`} style={{ flex: 1 }}>AMBER</button>
+                          <button onClick={() => setTheme('GREEN')} className={`osb-button ${theme === 'GREEN' ? 'active' : ''}`} style={{ flex: 1 }}>GREEN</button>
+                          <button onClick={() => setTheme('RED')} className={`osb-button ${theme === 'RED' ? 'active' : ''}`} style={{ flex: 1 }}>RED</button>
+                          <button onClick={() => setTheme('WHITE')} className={`osb-button ${theme === 'WHITE' ? 'active' : ''}`} style={{ flex: 1 }}>WHITE</button>
+                      </div>
+                  </div>
               </div>
               <div style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '8px', opacity: 0.4, fontSize: '10px' }}>
                   M107 HE / M777A2 HOW / ARMA REFORGER MOD
@@ -1285,11 +1313,9 @@ function App() {
                  
                  {timerRender}
              </div>
-             {(showDPad || showCoordsInput || showBDT) && (
                  <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                      
                      {/* DPAD & KEYPAD ROW */}
-                     {showDPad && (
                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                          {/* DPAD */}
                          <div className="dpad-item">
@@ -1331,11 +1357,9 @@ function App() {
                              </div>
                          </div>
                      </div>
-                     )}
 
                      <div className="sidebar-right-group">
                      {/* TERMINAL INPUTS */}
-                     {showCoordsInput && (
                          <div className="term-inputs-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
                              <TerminalField id="gunX" label="GUN X" val={gunX} />
                              <TerminalField id="gunY" label="GUN Y" val={gunY} />
@@ -1350,10 +1374,8 @@ function App() {
                              <div style={{ height: '4px' }} />
                              <TerminalField id="charge" label="CHARGE" val={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr} />
                          </div>
-                     )}
 
                      {/* BDT */}
-                     {showBDT && (
                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)' }}>
                              <div style={{ minHeight: '22px' }}>
                                  {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
@@ -1368,10 +1390,8 @@ function App() {
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>TOF</span><span>{tofStr}s</span></div>
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
                          </div>
-                     )}
                      </div>
                  </div>
-             )}
           </div>
        )}
         </div>
@@ -1400,27 +1420,7 @@ function App() {
                     >
                         FIT ZOOM
                     </button>
-                    <button
-                        className={`osb-button ${showDPad ? 'active' : ''}`}
-                        onClick={() => setShowDPad(!showDPad)}
-                        style={{ borderStyle: showDPad ? 'solid' : 'dashed' }}
-                    >
-                        DPAD
-                    </button>
-                    <button
-                        className={`osb-button ${showBDT ? 'active' : ''}`}
-                        onClick={() => setShowBDT(!showBDT)}
-                        style={{ borderStyle: showBDT ? 'solid' : 'dashed' }}
-                    >
-                        BDT
-                    </button>
-                    <button
-                        className={`osb-button ${showCoordsInput ? 'active' : ''}`}
-                        onClick={() => setShowCoordsInput(!showCoordsInput)}
-                        style={{ borderStyle: showCoordsInput ? 'solid' : 'dashed' }}
-                    >
-                        COORDS
-                    </button>
+
 
                     <div style={{ flex: 1 }} />
 
