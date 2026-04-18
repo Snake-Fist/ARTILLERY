@@ -246,7 +246,7 @@ const RepeatButton = ({ onClick, children, style, className }: any) => {
 };
 
 function App() {
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
   const soundEnabledRef = useRef(soundEnabled);
   useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
 
@@ -319,13 +319,13 @@ function App() {
   const [forcedChargeStr, setForcedChargeStr] = useState<string>('');
   const forcedCharge = forcedChargeStr === '' ? null : parseInt(forcedChargeStr);
   
-  const [mapSize, setMapSize] = useState<number>(8);
+  const [mapSize, setMapSize] = useState<number>(10);
+  const [showMapSizeControls, setShowMapSizeControls] = useState<boolean>(false);
   const [mapOriginX, setMapOriginX] = useState<number>(0);
   const [mapOriginY, setMapOriginY] = useState<number>(0);
   const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
 
   const [theme, setTheme] = useState<'AMBER' | 'GREEN' | 'RED' | 'WHITE'>('AMBER');
-  const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
   const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('MAP');
@@ -335,6 +335,7 @@ function App() {
   const [windSpeed, setWindSpeed] = useState<string>('');
   const [windDir, setWindDir] = useState<string>('');
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [justFocusedField, setJustFocusedField] = useState<string | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -375,13 +376,18 @@ function App() {
 
       if (e.key === 'Backspace') {
           e.preventDefault();
-          updateVal(prev => prev.slice(0, -1));
+          if (justFocusedField === activeField) {
+              updateVal(() => '');
+              setJustFocusedField(null);
+          } else {
+              updateVal(prev => prev.slice(0, -1));
+          }
           return;
       }
       if (/^[0-9]$/.test(e.key)) {
           e.preventDefault();
           const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
-          const prevStr = currVals[activeField] || '';
+          const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
           const nextVal = prevStr + e.key;
           let willTab = false;
           
@@ -390,7 +396,8 @@ function App() {
           if (activeField === 'charge' && /^[1-5]$/.test(e.key)) willTab = true;
 
           updateVal(prev => {
-              const nv = prev + e.key;
+              const base = justFocusedField === activeField ? '' : prev;
+              const nv = base + e.key;
               if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
@@ -402,31 +409,44 @@ function App() {
               return nv;
           });
           
+          if (justFocusedField === activeField) setJustFocusedField(null);
+          
           if (willTab) {
               const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
               const idx = fields.indexOf(activeField);
-              if (idx !== -1) setActiveField(fields[(idx + 1) % fields.length]);
+              if (idx !== -1) {
+                  const nf = fields[(idx + 1) % fields.length];
+                  setActiveField(nf);
+                  setJustFocusedField(nf);
+              }
           }
       }
       if (e.key === '.' && ['gunElev', 'tgtElev', 'windSpeed', 'windDir'].includes(activeField)) {
           e.preventDefault();
-          updateVal(prev => prev.includes('.') ? prev : prev + '.');
+          updateVal(prev => {
+              const base = justFocusedField === activeField ? '0' : prev;
+              return base.includes('.') ? base : base + '.';
+          });
+          if (justFocusedField === activeField) setJustFocusedField(null);
       }
       if (e.key === 'Enter' || e.code === 'Space' || e.key === 'Tab') {
           e.preventDefault();
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
           const idx = fields.indexOf(activeField);
           if (idx !== -1) {
-              setActiveField(fields[(idx + 1) % fields.length]);
+              const nf = fields[(idx + 1) % fields.length];
+              setActiveField(nf);
+              setJustFocusedField(nf);
           } else {
               setActiveField(null);
+              setJustFocusedField(null);
           }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr]);
+  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr, justFocusedField]);
 
   const handleKeypadPress = (val: string) => {
       if (!activeField) return;
@@ -443,19 +463,39 @@ function App() {
       };
       if (val === 'CLR') {
           updateVal(() => '');
+          if (justFocusedField === activeField) setJustFocusedField(null);
       } else if (val === 'DEL') {
-          updateVal(prev => prev.slice(0, -1));
+          if (justFocusedField === activeField) {
+              updateVal(() => '');
+              setJustFocusedField(null);
+          } else {
+              updateVal(prev => prev.slice(0, -1));
+          }
       } else if (val === 'NEXT') {
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
           const idx = fields.indexOf(activeField);
           if (idx !== -1) {
-              setActiveField(fields[(idx + 1) % fields.length]);
+              const nf = fields[(idx + 1) % fields.length];
+              setActiveField(nf);
+              setJustFocusedField(nf);
           } else {
               setActiveField(null);
+              setJustFocusedField(null);
+          }
+      } else if (val === 'PREV') {
+          const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+          const idx = fields.indexOf(activeField);
+          if (idx !== -1) {
+              const nf = fields[(idx - 1 + fields.length) % fields.length];
+              setActiveField(nf);
+              setJustFocusedField(nf);
+          } else {
+              setActiveField(null);
+              setJustFocusedField(null);
           }
       } else {
           const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
-          const prevStr = currVals[activeField] || '';
+          const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
           const nextVal = prevStr + val;
           let willTab = false;
           
@@ -464,7 +504,8 @@ function App() {
           if (activeField === 'charge' && /^[1-5]$/.test(val)) willTab = true;
 
           updateVal(prev => {
-              const nv = prev + val;
+              const base = justFocusedField === activeField ? '' : prev;
+              const nv = base + val;
               if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
@@ -476,10 +517,16 @@ function App() {
               return nv;
           });
           
+          if (justFocusedField === activeField) setJustFocusedField(null);
+          
           if (willTab) {
               const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
               const idx = fields.indexOf(activeField);
-              if (idx !== -1) setActiveField(fields[(idx + 1) % fields.length]);
+              if (idx !== -1) {
+                  const nf = fields[(idx + 1) % fields.length];
+                  setActiveField(nf);
+                  setJustFocusedField(nf);
+              }
           }
       }
   };
@@ -491,9 +538,27 @@ function App() {
       const chars = strVal.padStart(4, ' ').slice(-4);
       
       const slots = [];
+      slots.push(
+          <span key="arrow" style={{ 
+             display: 'inline-block',
+             width: '1ch',
+             textAlign: 'center'
+          }}>
+             {isActive ? '>' : '\u00A0'}
+          </span>
+      );
+
       for (let i = 0; i < 4; i++) {
          let char = chars[i];
-         let isHoverSlot = isActive && i === 3;
+         let isHoverSlot = false;
+         
+         if (isActive) {
+             if (justFocusedField === id) {
+                 isHoverSlot = true;
+             } else {
+                 isHoverSlot = i === 3;
+             }
+         }
          
          slots.push(
             <span key={i} className={isHoverSlot ? "term-cursor-animate" : ""} style={{ 
@@ -509,7 +574,7 @@ function App() {
       return (
           <div 
               style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }}
-              onClick={() => setActiveField(id)}
+              onClick={() => { setActiveField(id); setJustFocusedField(id); }}
           >
               <span style={{ fontSize: '14px', width: '70px', lineHeight: '14px' }}>{label}</span>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -865,6 +930,34 @@ function App() {
           ctx.stroke();
           
           ctx.setLineDash([]);
+
+          const wSpd = parseFloat(windSpeed);
+          const wDir = parseFloat(windDir);
+          if (!isNaN(wSpd) && !isNaN(wDir) && wSpd > 0) {
+              const maxLen = 40;
+              const len = Math.min(1, wSpd / 15) * maxLen;
+              
+              const angleRad = wDir * (Math.PI / 180);
+              const dx = Math.sin(angleRad) * len;
+              const dy = -Math.cos(angleRad) * len;
+              
+              const endX = gunPos.px + dx;
+              const endY = gunPos.py + dy;
+
+              ctx.beginPath();
+              ctx.moveTo(gunPos.px, gunPos.py);
+              ctx.lineTo(endX, endY);
+              
+              const headLen = 6;
+              const headAngle = Math.atan2(dy, dx);
+              ctx.lineTo(endX - Math.cos(headAngle - Math.PI / 6) * headLen, endY - Math.sin(headAngle - Math.PI / 6) * headLen);
+              ctx.moveTo(endX, endY);
+              ctx.lineTo(endX - Math.cos(headAngle + Math.PI / 6) * headLen, endY - Math.sin(headAngle + Math.PI / 6) * headLen);
+              
+              ctx.strokeStyle = mapFg;
+              ctx.lineWidth = 1;
+              ctx.stroke();
+          }
       }
       
       let tgtOrigPos = drawPoint(t_x, t_y, 'TGT', tgtElevStr);
@@ -1028,6 +1121,14 @@ function App() {
   };
 
   const handleZoomFit = () => {
+      if (zoomMode === 'FIT') {
+          setZoomMode('OFF');
+          setMapSize(10);
+          setMapOriginX(0);
+          setMapOriginY(0);
+          return;
+      }
+      
       let gx = parseGridPiece(gunX);
       let gy = parseGridPiece(gunY);
       let tx = parseGridPiece(tgtX);
@@ -1066,7 +1167,7 @@ function App() {
       const centerY = mapOriginY + (mapSize * 1000) / 2;
 
       let nextMode: 'OFF' | '2X' | '4X' | '8X' = 'OFF';
-      let nextSize = 8;
+      let nextSize = 10;
       
       if (zoomMode === 'OFF' || zoomMode === 'FIT') {
           nextMode = '2X'; nextSize = 4;
@@ -1075,7 +1176,7 @@ function App() {
       } else if (zoomMode === '4X') {
           nextMode = '8X'; nextSize = 1;
       } else {
-          nextMode = 'OFF'; nextSize = 8;
+          nextMode = 'OFF'; nextSize = 10;
       }
 
       setZoomMode(nextMode);
@@ -1223,15 +1324,15 @@ function App() {
       <div className="mfd-main">
         <div className="mfd-sidebar left">
             <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>MAP</button>
-            {activePage === 'MAP' && (
-                <button
-                    className={`osb-button ${showMapSizeInput ? 'active' : ''}`}
-                    onClick={() => setShowMapSizeInput(!showMapSizeInput)}
-                    style={{ borderStyle: showMapSizeInput ? 'solid' : 'dashed' }}
-                >
-                    MAP<br/>SIZE
-                </button>
+            <button className={`osb-button ${showMapSizeControls ? 'active' : ''}`} onClick={() => setShowMapSizeControls(!showMapSizeControls)}>MAP<br/>SIZE</button>
+            
+            {showMapSizeControls && (
+                <>
+                    <button className="osb-button" onClick={() => setMapSize(prev => Math.min(99, prev + 1))}>+ 1 KM²</button>
+                    <button className="osb-button" onClick={() => setMapSize(prev => Math.max(1, prev - 1))}>- 1 KM²</button>
+                </>
             )}
+
             <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
         </div>
@@ -1239,6 +1340,18 @@ function App() {
         <div className="mfd-screen">
           {activePage === 'COORDS' && (
             <div className="input-section" style={{ flex: 1, overflowY: 'auto' }}>
+        <div className="input-group">
+            <label>MAP SIZE (KM²):</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' }}>
+                <input 
+                    type="number" 
+                    value={mapSize} 
+                    onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '6px', width: '80px', outline: 'none', fontSize: '16px' }}
+                />
+            </div>
+        </div>
+        <div style={{ borderBottom: '1px dashed var(--term-border)', margin: '20px 0', opacity: 0.5 }} />
         <div className="input-group">
             <label>GUN GRID:</label>
             <div className="grid-inputs">
@@ -1433,20 +1546,8 @@ function App() {
                      </div>
                  )}
                  
-                 <div style={{ position: 'absolute', top: '15px', left: '15px', display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none', zIndex: 12 }}>
-                     {showMapSizeInput && (
-                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px' }}>MAP SIZE:</span>
-                              <input 
-                                  type="number" 
-                                  value={mapSize} 
-                                  onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
-                                  style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px 4px', outline: 'none' }}
-                              />
-                              <span style={{ fontSize: '12px' }}>KM</span>
-                          </div>
-                     )}
-
+                 <div style={{ position: 'absolute', top: '4px', left: '4px', display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none', zIndex: 12 }}>
+                     <div style={{ color: 'var(--term-fg)', fontSize: '10px', fontFamily: 'monospace' }}>{mapSize} KM²</div>
                  </div>
                  
                  {timerRender}
@@ -1491,7 +1592,10 @@ function App() {
                                  <RepeatButton className="dpad-btn" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('CLR')}>CLR</RepeatButton>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
                                  <button className="dpad-btn dpad-btn-reset" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('DEL')}>DEL</button>
-                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '18px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▶</button>
+                                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '4px' }}>
+                                     <button className="dpad-btn" style={{ flex: 1, fontSize: '18px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('PREV')}>▲</button>
+                                     <button className="dpad-btn" style={{ flex: 1, fontSize: '18px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▼</button>
+                                 </div>
                              </div>
                          </div>
                      </div>
@@ -1525,7 +1629,8 @@ function App() {
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>WND</span><span>{windSpeed && parseFloat(windSpeed) > 0 ? `${windSpeed}m/s @ ${windDir || '0'}` : '--'}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
                          </div>
                      </div>
