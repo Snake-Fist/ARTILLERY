@@ -404,8 +404,8 @@ button:active {
     flex-direction: column;
     height: 100%;
     flex: 1;
-    padding: 0 40px;
-    gap: 30px;
+    padding: 0 15px;
+    gap: 20px;
   }
   .sidebar-right-group {
     display: flex;
@@ -433,7 +433,7 @@ button:active {
     flex-wrap: wrap;
     gap: 15px;
     margin-top: 10px;
-    padding: 0 20px;
+    padding: 0 15px;
     box-sizing: border-box;
   }
   .sidebar-right-group {
