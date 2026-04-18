@@ -1465,10 +1465,10 @@ function App() {
                     {fireStarts.length > 0 ? (
                         <button 
                             className="osb-button" 
-                            onClick={() => setFireStarts([])}
-                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
+                            onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
+                            style={{ borderStyle: 'solid', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
                         >
-                            X
+                            <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
                         </button>
                     ) : (
                         <button 
@@ -1503,10 +1503,10 @@ function App() {
                     {fireStarts.length > 0 ? (
                         <button 
                             className="osb-button" 
-                            onClick={() => setFireStarts([])}
-                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
+                            onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
+                            style={{ borderStyle: 'solid', background: 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)', color: 'var(--term-fg)' }}
                         >
-                            X
+                            <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
                         </button>
                     ) : (
                         <button 
