@@ -1454,11 +1454,20 @@ function App() {
                             + ROUND
                         </button>
                     )}
-                    {calculation.valid && (
-                        <button className="osb-button" onClick={handleFire}>
-                            FIRE
-                        </button>
-                    )}
+                    <button 
+                        className="osb-button" 
+                        onClick={calculation.valid ? handleFire : undefined}
+                        style={{
+                            borderStyle: 'solid',
+                            cursor: calculation.valid ? 'pointer' : 'not-allowed',
+                            opacity: calculation.valid ? 1 : 0.6,
+                            background: calculation.valid 
+                                ? 'var(--term-bg)' 
+                                : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
+                        }}
+                    >
+                        FIRE
+                    </button>
                 </>
             ) : (
                 <>
@@ -1473,11 +1482,20 @@ function App() {
                             + ROUND
                         </button>
                     )}
-                    {calculation.valid && (
-                        <button className="osb-button" onClick={handleFire}>
-                            FIRE
-                        </button>
-                    )}
+                    <button 
+                        className="osb-button" 
+                        onClick={calculation.valid ? handleFire : undefined}
+                        style={{
+                            borderStyle: 'solid',
+                            cursor: calculation.valid ? 'pointer' : 'not-allowed',
+                            opacity: calculation.valid ? 1 : 0.5,
+                            background: calculation.valid 
+                                ? 'var(--term-bg)' 
+                                : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
+                        }}
+                    >
+                        FIRE
+                    </button>
                 </>
             )}
         </div>
