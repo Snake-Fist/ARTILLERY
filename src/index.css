@@ -398,6 +398,7 @@ button:active {
     height: 100%;
     aspect-ratio: 1 / 1;
     flex-shrink: 0;
+    align-self: flex-start;
   }
   .dpads-sidebar {
     display: flex;
