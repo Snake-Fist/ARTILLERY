@@ -674,7 +674,8 @@ function App() {
     let effectiveRange = r;
     let azFix = 0;
     
-    const aerodynamicK = 0.37;
+    // Reverted to 0.48 (calculated from the 5k shot) for testing on latest web app
+    const aerodynamicK = 0.48;
     let wSpeed = parseFloat(windSpeed);
     let wDir = parseFloat(windDir);
     if (!isNaN(wSpeed) && !isNaN(wDir) && gridData) {
@@ -950,9 +951,9 @@ function App() {
               
               const headLen = 6;
               const headAngle = Math.atan2(dy, dx);
-              ctx.lineTo(endX - Math.cos(headAngle - Math.PI / 6) * headLen, endY - Math.sin(headAngle - Math.PI / 6) * headLen);
+              ctx.lineTo(endX + Math.cos(headAngle - Math.PI / 6) * headLen, endY + Math.sin(headAngle - Math.PI / 6) * headLen);
               ctx.moveTo(endX, endY);
-              ctx.lineTo(endX - Math.cos(headAngle + Math.PI / 6) * headLen, endY - Math.sin(headAngle + Math.PI / 6) * headLen);
+              ctx.lineTo(endX + Math.cos(headAngle + Math.PI / 6) * headLen, endY + Math.sin(headAngle + Math.PI / 6) * headLen);
               
               ctx.strokeStyle = mapFg;
               ctx.lineWidth = 1;
