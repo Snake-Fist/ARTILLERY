@@ -1184,9 +1184,9 @@ function App() {
                 <div className="grid-input-wrapper">
                     <span>C:</span>
                     <select 
-                        value={forcedCharge === null ? 'AUTO' : forcedCharge.toString()}
+                        value={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr}
                         onChange={(e) => {
-                            setForcedCharge(e.target.value === 'AUTO' ? null : parseInt(e.target.value));
+                            setForcedChargeStr(e.target.value === 'AUTO' ? '' : e.target.value);
                             
                         }}
                         style={{
