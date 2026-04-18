@@ -250,7 +250,8 @@ function App() {
   const [adjW, setAdjW] = useState<string>('');
   const [gunElevStr, setGunElevStr] = useState<string>('0');
   const [tgtElevStr, setTgtElevStr] = useState<string>('0');
-  const [forcedCharge, setForcedCharge] = useState<number | null>(null);
+  const [forcedChargeStr, setForcedChargeStr] = useState<string>('');
+  const forcedCharge = forcedChargeStr === '' ? null : parseInt(forcedChargeStr);
   
   const [mapSize, setMapSize] = useState<number>(8);
   const [mapOriginX, setMapOriginX] = useState<number>(0);
@@ -259,15 +260,180 @@ function App() {
 
   const [showDPad, setShowDPad] = useState<boolean>(true);
   const [showBDT, setShowBDT] = useState<boolean>(true);
-  const [bdtPosition, setBdtPosition] = useState<'bottom-left' | 'top-left'>('bottom-left');
   const [showMapSizeInput, setShowMapSizeInput] = useState<boolean>(false);
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
   const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
   const [showCoordsInput, setShowCoordsInput] = useState<boolean>(false);
-  const [rangeCorrection, setRangeCorrection] = useState<boolean>(true);
   const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS'>('MAP');
   const [cursorPos, setCursorPos] = useState<{clientPx: number, clientPy: number, coord: string} | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [windSpeed, setWindSpeed] = useState<string>('');
+  const [windDir, setWindDir] = useState<string>('');
+  const [activeField, setActiveField] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeField) return;
+      
+      const updateVal = (updater: (prev: string) => string) => {
+        if (activeField === 'gunX') setGunX(updater);
+        if (activeField === 'gunY') setGunY(updater);
+        if (activeField === 'tgtX') setTgtX(updater);
+        if (activeField === 'tgtY') setTgtY(updater);
+        if (activeField === 'gunElev') setGunElevStr(updater);
+        if (activeField === 'tgtElev') setTgtElevStr(updater);
+        if (activeField === 'windSpeed') setWindSpeed(updater);
+        if (activeField === 'windDir') setWindDir(updater);
+        if (activeField === 'charge') setForcedChargeStr(updater);
+      };
+
+      if (e.key === 'Backspace') {
+          e.preventDefault();
+          updateVal(prev => prev.slice(0, -1));
+          return;
+      }
+      if (/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
+          const prevStr = currVals[activeField] || '';
+          const nextVal = prevStr + e.key;
+          let willTab = false;
+          
+          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nextVal.length === 4) willTab = true;
+          if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
+          if (activeField === 'charge' && /^[1-5]$/.test(e.key)) willTab = true;
+
+          updateVal(prev => {
+              const nv = prev + e.key;
+              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
+              if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
+              if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
+              if (activeField === 'charge') {
+                  if (e.key === '0') return '';
+                  if (/^[1-5]$/.test(e.key)) return e.key;
+                  return prev;
+              }
+              return nv;
+          });
+          
+          if (willTab) {
+              const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+              const idx = fields.indexOf(activeField);
+              if (idx !== -1) setActiveField(fields[(idx + 1) % fields.length]);
+          }
+      }
+      if (e.key === '.' && ['gunElev', 'tgtElev', 'windSpeed', 'windDir'].includes(activeField)) {
+          e.preventDefault();
+          updateVal(prev => prev.includes('.') ? prev : prev + '.');
+      }
+      if (e.key === 'Enter' || e.code === 'Space' || e.key === 'Tab') {
+          e.preventDefault();
+          const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+          const idx = fields.indexOf(activeField);
+          if (idx !== -1) {
+              setActiveField(fields[(idx + 1) % fields.length]);
+          } else {
+              setActiveField(null);
+          }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr]);
+
+  const handleKeypadPress = (val: string) => {
+      if (!activeField) return;
+      const updateVal = (updater: (prev: string) => string) => {
+        if (activeField === 'gunX') setGunX(updater);
+        if (activeField === 'gunY') setGunY(updater);
+        if (activeField === 'tgtX') setTgtX(updater);
+        if (activeField === 'tgtY') setTgtY(updater);
+        if (activeField === 'gunElev') setGunElevStr(updater);
+        if (activeField === 'tgtElev') setTgtElevStr(updater);
+        if (activeField === 'windSpeed') setWindSpeed(updater);
+        if (activeField === 'windDir') setWindDir(updater);
+        if (activeField === 'charge') setForcedChargeStr(updater);
+      };
+      if (val === 'DEL') {
+          updateVal(prev => prev.slice(0, -1));
+      } else if (val === 'NEXT') {
+          const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+          const idx = fields.indexOf(activeField);
+          if (idx !== -1) {
+              setActiveField(fields[(idx + 1) % fields.length]);
+          } else {
+              setActiveField(null);
+          }
+      } else {
+          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
+          const prevStr = currVals[activeField] || '';
+          const nextVal = prevStr + val;
+          let willTab = false;
+          
+          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nextVal.length === 4) willTab = true;
+          if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
+          if (activeField === 'charge' && /^[1-5]$/.test(val)) willTab = true;
+
+          updateVal(prev => {
+              const nv = prev + val;
+              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
+              if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
+              if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
+              if (activeField === 'charge') {
+                  if (val === '0') return '';
+                  if (/^[1-5]$/.test(val)) return val;
+                  return prev;
+              }
+              return nv;
+          });
+          
+          if (willTab) {
+              const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+              const idx = fields.indexOf(activeField);
+              if (idx !== -1) setActiveField(fields[(idx + 1) % fields.length]);
+          }
+      }
+  };
+
+  const TerminalField = ({ id, label, val }: {id: string, label: string, val: string}) => {
+      const isActive = activeField === id;
+      
+      const strVal = String(val === '' || val === undefined || val === null ? '-' : val);
+      const chars = strVal.padStart(4, ' ').slice(-4);
+      
+      const slots = [];
+      for (let i = 0; i < 4; i++) {
+         let char = chars[i];
+         let isHoverSlot = isActive && i === 3;
+         
+         slots.push(
+            <span key={i} className={isHoverSlot ? "term-cursor-animate" : ""} style={{ 
+               display: 'inline-block',
+               width: '1ch',
+               textAlign: 'center'
+            }}>
+               {char === ' ' || char === '' ? '\u00A0' : char}
+            </span>
+         );
+      }
+
+      return (
+          <div 
+              style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }}
+              onClick={() => setActiveField(id)}
+          >
+              <span style={{ fontSize: '14px', width: '70px', lineHeight: '14px' }}>{label}</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ fontSize: '14px', lineHeight: '14px', color: 'var(--term-bg)', backgroundColor: 'var(--term-fg)', fontWeight: 'bold', display: 'flex', justifyContent: 'flex-start' }}>
+                      {slots}
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
 
   const [fireStarts, setFireStarts] = useState<{id: number, start: number, tof: number, tx: number, ty: number, disp: number}[]>([]);
   const [now, setNow] = useState<number>(Date.now());
@@ -313,7 +479,7 @@ function App() {
         const rawR = parseFloat(activeRange);
         
         if (isNaN(rawR)) return { valid: false, message: 'INVALID RANGE' };
-        const r = rangeCorrection ? rawR * 0.96 : rawR;
+        const r = rawR;
         
         // Find viable charge
         let activeCharge = null;
@@ -409,7 +575,7 @@ function App() {
     } catch (err: any) {
         return { valid: false, message: `CRASH: ${err.message}` };
     }
-  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, rangeCorrection]);
+  }, [activeRange, gunElevStr, tgtElevStr, forcedCharge, ]);
 
   useEffect(() => {
     setFireStarts(prev => prev.filter(fs => {
@@ -489,7 +655,7 @@ function App() {
           if (y >= 0 && py < canvas.height - 10) ctx.fillText((Math.floor(y/1000) % 100).toString().padStart(2,'0'), 2, py - 2);
       }
 
-      const drawPoint = (x: number | null, y: number | null, label: string) => {
+      const drawPoint = (x: number | null, y: number | null, label: string, alt?: string) => {
           if (x === null || y === null) return null;
           const px = ((x - mapOriginX) / mapMeters) * canvas.width;
           const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
@@ -514,6 +680,10 @@ function App() {
           }
           ctx.fillText(coordStr, textX, py + 12);
           
+          if (alt) {
+              ctx.fillText(`ALT ${alt}`, textX, py + 22);
+          }
+          
           return {px, py};
       };
 
@@ -522,7 +692,7 @@ function App() {
       const t_x = parseGridPiece(tgtX);
       const t_y = parseGridPiece(tgtY);
 
-      let gunPos = drawPoint(g_x, g_y, 'GUN');
+      let gunPos = drawPoint(g_x, g_y, 'GUN', gunElevStr);
 
       if (gunPos) {
           let minR = CHARGES[0].min;
@@ -534,11 +704,6 @@ function App() {
                   minR = fc.min;
                   maxR = fc.max;
               }
-          }
-
-          if (rangeCorrection) {
-              minR = minR / 0.96;
-              maxR = maxR / 0.96;
           }
 
           const minRPx = (minR / mapMeters) * canvas.width;
@@ -561,7 +726,7 @@ function App() {
           ctx.setLineDash([]);
       }
       
-      let tgtOrigPos = drawPoint(t_x, t_y, 'TGT');
+      let tgtOrigPos = drawPoint(t_x, t_y, 'TGT', tgtElevStr);
       
       const isAdjusted = (parseFloat(adjN||'0') !== 0 || parseFloat(adjS||'0') !== 0 || parseFloat(adjE||'0') !== 0 || parseFloat(adjW||'0') !== 0);
       
@@ -578,7 +743,7 @@ function App() {
       
       let tgtAdjPos = null;
       if (isAdjusted) {
-          tgtAdjPos = drawPoint(final_tx, final_ty, 'ADJ');
+          tgtAdjPos = drawPoint(final_tx, final_ty, 'ADJ', tgtElevStr);
           if (tgtOrigPos && tgtAdjPos) {
               ctx.strokeStyle = '#ffbb0080';
               ctx.setLineDash([2, 4]);
@@ -1059,40 +1224,6 @@ function App() {
                   SYSTEM CONFIGURATION
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '11px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <input
-                          id="range-correction-cb"
-                          type="checkbox"
-                          checked={rangeCorrection}
-                          onChange={(e) => setRangeCorrection(e.target.checked)}
-                          style={{ marginTop: '2px', accentColor: 'var(--term-fg)', cursor: 'pointer', width: '14px', height: '14px', flexShrink: 0 }}
-                      />
-                      <label htmlFor="range-correction-cb" style={{ cursor: 'pointer', lineHeight: 1.5 }}>
-                          RANGE CORRECTION (×0.96)<br/>
-                          <span style={{ opacity: 0.6, fontSize: '10px' }}>
-                              Compensates for ~4% overshoot observed in current mod version.
-                              Reduces effective range by 4% before table lookup.
-                          </span>
-                      </label>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                      <label style={{ lineHeight: 1.5 }}>BDT LOCATION</label>
-                      <select 
-                          value={bdtPosition} 
-                          onChange={(e) => setBdtPosition(e.target.value as 'bottom-left' | 'top-left')}
-                          style={{
-                              backgroundColor: 'transparent',
-                              border: '1px solid var(--term-border)',
-                              color: 'var(--term-fg)',
-                              fontFamily: 'inherit',
-                              padding: '2px',
-                              outline: 'none'
-                          }}
-                      >
-                          <option value="bottom-left" style={{ background: 'var(--term-bg)' }}>BOTTOM LEFT</option>
-                          <option value="top-left" style={{ background: 'var(--term-bg)' }}>TOP LEFT</option>
-                      </select>
-                  </div>
               </div>
               <div style={{ borderTop: '1px dashed var(--term-border)', paddingTop: '8px', opacity: 0.4, fontSize: '10px' }}>
                   M107 HE / M777A2 HOW / ARMA REFORGER MOD
@@ -1151,106 +1282,95 @@ function App() {
                           </div>
                      )}
 
-                     {showCoordsInput && (
-                          <div style={{ pointerEvents: 'auto', backgroundColor: 'var(--term-bg)', border: '1px solid var(--term-border)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '12px', width: '30px' }}>GUN:</span>
-                                  <input type="text" value={gunX} onChange={e => setGunX(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="X" />
-                                  <input type="text" value={gunY} onChange={e => setGunY(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="Y" />
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '12px', width: '30px' }}>TGT:</span>
-                                  <input type="text" value={tgtX} onChange={e => setTgtX(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="X" />
-                                  <input type="text" value={tgtY} onChange={e => setTgtY(e.target.value)} style={{ width: '50px', backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '2px', outline: 'none' }} placeholder="Y" />
-                              </div>
-                          </div>
-                      )}
                  </div>
                  
                  {timerRender}
-
-                 {showBDT && (
-                      <div style={{ position: 'absolute', bottom: bdtPosition === 'bottom-left' ? '15px' : undefined, top: bdtPosition === 'top-left' ? '120px' : undefined, left: '15px', zIndex: 10, fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', fontFamily: 'inherit', pointerEvents: 'none' }}>
-                          {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-                              <div style={{ color: '#ffbb00', marginBottom: '4px' }}>{calculation.message}</div>
-                          )}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>TOF</span><span>{tofStr}s</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
-                      </div>
-                  )}
              </div>
 
-             {showDPad && (
-                 <div className="dpads-sidebar">
-                     <div className="dpad-item" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
-                         <button 
-                             style={{ background: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', cursor: 'pointer', fontSize: '10px', width: '100px', marginBottom: '8px', padding: '4px' }}
-                             onClick={() => {
-                                 if (dpadMode === 'TGT') setDpadMode('GUN');
-                                 else if (dpadMode === 'GUN') setDpadMode('ADJUST');
-                                 else if (dpadMode === 'ADJUST') setDpadMode('PAN');
-                                 else setDpadMode('TGT');
-                             }}
-                         >
-                             MODE: {dpadMode === 'PAN' && zoomMode === 'OFF' ? 'PAN (N/A)' : dpadMode}
-                         </button>
-                         <div className="dpad-grid">
-                             <div />
-                             <RepeatButton 
-                                className="dpad-btn"
-                                onClick={() => {
-                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'N');
-                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N');
-                                    else if (dpadMode === 'ADJUST') handleAdjust('N');
-                                    else if (dpadMode === 'PAN') handlePan('N');
-                                }}
-                             >▲</RepeatButton>
-                             <div />
-                             
-                             <RepeatButton 
-                                className="dpad-btn"
-                                onClick={() => {
-                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'W');
-                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W');
-                                    else if (dpadMode === 'ADJUST') handleAdjust('W');
-                                    else if (dpadMode === 'PAN') handlePan('W');
-                                }}
-                             >◀</RepeatButton>
-                             
-                             {dpadMode === 'ADJUST' ? (
-                                <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0 }}>⨯</button>
-                             ) : (
-                                <div />
-                             )}
-                             
-                             <RepeatButton 
-                                className="dpad-btn"
-                                onClick={() => {
-                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'E');
-                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E');
-                                    else if (dpadMode === 'ADJUST') handleAdjust('E');
-                                    else if (dpadMode === 'PAN') handlePan('E');
-                                }}
-                             >▶</RepeatButton>
-                             <div />
-                             
-                             <RepeatButton 
-                                className="dpad-btn"
-                                onClick={() => {
-                                    if (dpadMode === 'GUN') handleGridAdjust('gun', 'S');
-                                    else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S');
-                                    else if (dpadMode === 'ADJUST') handleAdjust('S');
-                                    else if (dpadMode === 'PAN') handlePan('S');
-                                }}
-                             >▼</RepeatButton>
-                             <div />
+             {(showDPad || showCoordsInput || showBDT) && (
+                 <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '220px' }}>
+                     
+                     {/* DPAD & KEYPAD ROW */}
+                     {showDPad && (
+                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                         {/* DPAD */}
+                         <div className="dpad-item">
+                             <div style={{ fontSize: '10px', textAlign: 'center', marginBottom: '4px', textTransform: 'uppercase' }}>{dpadMode === 'PAN' && zoomMode === 'OFF' ? 'N/A' : dpadMode}</div>
+                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 26px)', gridTemplateRows: 'repeat(5, 26px)', gap: '2px' }}>
+                                 <div />
+                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'N'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N'); else if (dpadMode === 'ADJUST') handleAdjust('N'); else if (dpadMode === 'PAN') handlePan('N'); }}>▲</RepeatButton>
+                                 <div />
+                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'W'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W'); else if (dpadMode === 'ADJUST') handleAdjust('W'); else if (dpadMode === 'PAN') handlePan('W'); }}>◀</RepeatButton>
+                                 {dpadMode === 'ADJUST' ? <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0 }}>⨯</button> : <div />}
+                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'E'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E'); else if (dpadMode === 'ADJUST') handleAdjust('E'); else if (dpadMode === 'PAN') handlePan('E'); }}>▶</RepeatButton>
+                                 <div />
+                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'S'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S'); else if (dpadMode === 'ADJUST') handleAdjust('S'); else if (dpadMode === 'PAN') handlePan('S'); }}>▼</RepeatButton>
+                                 <div />
+                                 <div />
+                                 <div />
+                                 <div />
+                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '10px', borderStyle: 'solid' }} onClick={() => { if (dpadMode === 'TGT') setDpadMode('GUN'); else if (dpadMode === 'GUN') setDpadMode('ADJUST'); else if (dpadMode === 'ADJUST') setDpadMode('PAN'); else setDpadMode('TGT'); }}>MODE</button>
+                             </div>
+                         </div>
+                         
+                         {/* KEYPAD */}
+                         <div className="dpad-item">
+                             <div style={{ fontSize: '10px', textAlign: 'center', marginBottom: '4px' }}>KEYPAD</div>
+                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 26px)', gridTemplateRows: 'repeat(5, 26px)', gap: '2px' }}>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('7')}>7</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('8')}>8</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('9')}>9</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('4')}>4</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('5')}>5</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('6')}>6</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('1')}>1</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('2')}>2</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('3')}>3</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('.')}>.</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
+                                 <button className="dpad-btn dpad-btn-reset" style={{fontSize: '10px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('DEL')}>DEL</button>
+                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '14px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▶</button>
+                             </div>
                          </div>
                      </div>
+                     )}
+
+                     {/* TERMINAL INPUTS */}
+                     {showCoordsInput && (
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
+                             <TerminalField id="gunX" label="GUN X" val={gunX} />
+                             <TerminalField id="gunY" label="GUN Y" val={gunY} />
+                             <TerminalField id="gunElev" label="GUN ALT" val={gunElevStr} />
+                             <div style={{ height: '4px' }} />
+                             <TerminalField id="tgtX" label="TGT X" val={tgtX} />
+                             <TerminalField id="tgtY" label="TGT Y" val={tgtY} />
+                             <TerminalField id="tgtElev" label="TGT ALT" val={tgtElevStr} />
+                             <div style={{ height: '4px' }} />
+                             <TerminalField id="windSpeed" label="WND SPD" val={windSpeed} />
+                             <TerminalField id="windDir" label="WND DIR" val={windDir} />
+                             <div style={{ height: '4px' }} />
+                             <TerminalField id="charge" label="CHARGE" val={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr} />
+                         </div>
+                     )}
+
+                     {/* BDT */}
+                     {showBDT && (
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)' }}>
+                             <div style={{ minHeight: '22px' }}>
+                                 {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                                     <div style={{ color: '#ffbb00', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
+                                 )}
+                             </div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
+                         </div>
+                     )}
+
                  </div>
              )}
           </div>
