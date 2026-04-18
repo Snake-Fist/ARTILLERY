@@ -1286,58 +1286,58 @@ function App() {
                  
                  {timerRender}
              </div>
-
              {(showDPad || showCoordsInput || showBDT) && (
-                 <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '220px' }}>
+                 <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                      
                      {/* DPAD & KEYPAD ROW */}
                      {showDPad && (
-                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                          {/* DPAD */}
                          <div className="dpad-item">
-                             <div style={{ fontSize: '10px', textAlign: 'center', marginBottom: '4px', textTransform: 'uppercase' }}>{dpadMode === 'PAN' && zoomMode === 'OFF' ? 'N/A' : dpadMode}</div>
-                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 26px)', gridTemplateRows: 'repeat(5, 26px)', gap: '2px' }}>
+                             <div style={{ fontSize: '12px', textAlign: 'center', marginBottom: '4px', textTransform: 'uppercase' }}>{dpadMode === 'PAN' && zoomMode === 'OFF' ? 'N/A' : dpadMode}</div>
+                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 40px)', gridTemplateRows: 'repeat(5, 40px)', gap: '4px' }}>
                                  <div />
-                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'N'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N'); else if (dpadMode === 'ADJUST') handleAdjust('N'); else if (dpadMode === 'PAN') handlePan('N'); }}>▲</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'N'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N'); else if (dpadMode === 'ADJUST') handleAdjust('N'); else if (dpadMode === 'PAN') handlePan('N'); }}>▲</RepeatButton>
                                  <div />
-                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'W'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W'); else if (dpadMode === 'ADJUST') handleAdjust('W'); else if (dpadMode === 'PAN') handlePan('W'); }}>◀</RepeatButton>
-                                 {dpadMode === 'ADJUST' ? <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0 }}>⨯</button> : <div />}
-                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'E'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E'); else if (dpadMode === 'ADJUST') handleAdjust('E'); else if (dpadMode === 'PAN') handlePan('E'); }}>▶</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'W'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W'); else if (dpadMode === 'ADJUST') handleAdjust('W'); else if (dpadMode === 'PAN') handlePan('W'); }}>◀</RepeatButton>
+                                 {dpadMode === 'ADJUST' ? <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0, fontSize: '18px' }}>⨯</button> : <div />}
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'E'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E'); else if (dpadMode === 'ADJUST') handleAdjust('E'); else if (dpadMode === 'PAN') handlePan('E'); }}>▶</RepeatButton>
                                  <div />
-                                 <RepeatButton className="dpad-btn" onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'S'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S'); else if (dpadMode === 'ADJUST') handleAdjust('S'); else if (dpadMode === 'PAN') handlePan('S'); }}>▼</RepeatButton>
-                                 <div />
-                                 <div />
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'S'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S'); else if (dpadMode === 'ADJUST') handleAdjust('S'); else if (dpadMode === 'PAN') handlePan('S'); }}>▼</RepeatButton>
                                  <div />
                                  <div />
-                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '10px', borderStyle: 'solid' }} onClick={() => { if (dpadMode === 'TGT') setDpadMode('GUN'); else if (dpadMode === 'GUN') setDpadMode('ADJUST'); else if (dpadMode === 'ADJUST') setDpadMode('PAN'); else setDpadMode('TGT'); }}>MODE</button>
+                                 <div />
+                                 <div />
+                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '12px', borderStyle: 'solid' }} onClick={() => { if (dpadMode === 'TGT') setDpadMode('GUN'); else if (dpadMode === 'GUN') setDpadMode('ADJUST'); else if (dpadMode === 'ADJUST') setDpadMode('PAN'); else setDpadMode('TGT'); }}>MODE</button>
                              </div>
                          </div>
                          
                          {/* KEYPAD */}
-                         <div className="dpad-item">
-                             <div style={{ fontSize: '10px', textAlign: 'center', marginBottom: '4px' }}>KEYPAD</div>
-                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 26px)', gridTemplateRows: 'repeat(5, 26px)', gap: '2px' }}>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('7')}>7</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('8')}>8</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('9')}>9</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('4')}>4</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('5')}>5</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('6')}>6</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('1')}>1</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('2')}>2</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('3')}>3</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('.')}>.</RepeatButton>
-                                 <RepeatButton className="dpad-btn" style={{fontSize: '14px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
-                                 <button className="dpad-btn dpad-btn-reset" style={{fontSize: '10px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('DEL')}>DEL</button>
-                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '14px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▶</button>
+                         <div className="dpad-item" style={{ marginLeft: 'auto' }}>
+                             <div style={{ fontSize: '12px', textAlign: 'center', marginBottom: '4px' }}>KEYPAD</div>
+                             <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 40px)', gridTemplateRows: 'repeat(5, 40px)', gap: '4px' }}>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('7')}>7</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('8')}>8</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('9')}>9</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('4')}>4</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('5')}>5</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('6')}>6</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('1')}>1</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('2')}>2</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('3')}>3</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('.')}>.</RepeatButton>
+                                 <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
+                                 <button className="dpad-btn dpad-btn-reset" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => handleKeypadPress('DEL')}>DEL</button>
+                                 <button className="dpad-btn" style={{ gridColumn: '1 / -1', fontSize: '18px', borderStyle: 'solid', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => handleKeypadPress('NEXT')}>▶</button>
                              </div>
                          </div>
                      </div>
                      )}
 
+                     <div className="sidebar-right-group">
                      {/* TERMINAL INPUTS */}
                      {showCoordsInput && (
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
+                         <div className="term-inputs-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
                              <TerminalField id="gunX" label="GUN X" val={gunX} />
                              <TerminalField id="gunY" label="GUN Y" val={gunY} />
                              <TerminalField id="gunElev" label="GUN ALT" val={gunElevStr} />
@@ -1370,7 +1370,7 @@ function App() {
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
                          </div>
                      )}
-
+                     </div>
                  </div>
              )}
           </div>
