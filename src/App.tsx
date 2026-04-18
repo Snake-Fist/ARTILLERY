@@ -1619,7 +1619,7 @@ function App() {
                          </div>
 
                      {/* BDT */}
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)' }}>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', flex: 1, justifyContent: 'flex-end' }}>
                              <div style={{ minHeight: '22px' }}>
                                  {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
                                      <div style={{ color: 'var(--term-fg)', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
