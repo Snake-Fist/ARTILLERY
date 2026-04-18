@@ -2,14 +2,14 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import './index.css';
 import enterInSnd from './assets/enter-in.wav';
 import enterOutSnd from './assets/enter-out.wav';
-import zeroInSnd from './assets/zero-in.wav';
-import zeroOutSnd from './assets/zero-out.wav';
 import keyIn1Snd from './assets/key-in-1.wav';
 import keyOut1Snd from './assets/key-out-1.wav';
 import keyIn2Snd from './assets/key-in-2.wav';
 import keyOut2Snd from './assets/key-out-2.wav';
 import keyIn3Snd from './assets/key-in-3.wav';
 import keyOut3Snd from './assets/key-out-3.wav';
+import keyIn4Snd from './assets/key-in-4.wav';
+import keyOut4Snd from './assets/key-out-4.wav';
 
 // M107 HE Ballistic Data for Charges 1-5
 const CHARGES = [
@@ -253,11 +253,11 @@ function App() {
   useEffect(() => {
     const soundRegistry = {
       enter: { in: enterInSnd, out: enterOutSnd },
-      zero: { in: zeroInSnd, out: zeroOutSnd },
       keys: [
         { in: keyIn1Snd, out: keyOut1Snd },
         { in: keyIn2Snd, out: keyOut2Snd },
-        { in: keyIn3Snd, out: keyOut3Snd }
+        { in: keyIn3Snd, out: keyOut3Snd },
+        { in: keyIn4Snd, out: keyOut4Snd }
       ]
     };
     
@@ -279,9 +279,6 @@ function App() {
       if (text === '↓' || text.includes('COMMIT')) {
         playSnd(soundRegistry.enter.in);
         data = { type: 'enter' };
-      } else if (text === '0') {
-        playSnd(soundRegistry.zero.in);
-        data = { type: 'zero' };
       } else {
         const idx = Math.floor(Math.random() * soundRegistry.keys.length);
         playSnd(soundRegistry.keys[idx].in);
@@ -294,7 +291,6 @@ function App() {
       const data = activeSounds.get(e.pointerId);
       if (data) {
         if (data.type === 'enter') playSnd(soundRegistry.enter.out);
-        else if (data.type === 'zero') playSnd(soundRegistry.zero.out);
         else if (data.type === 'key' && data.index !== undefined) playSnd(soundRegistry.keys[data.index].out);
         activeSounds.delete(e.pointerId);
       }
