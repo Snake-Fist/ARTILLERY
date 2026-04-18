@@ -282,8 +282,8 @@ function App() {
       root.style.setProperty('--term-border', '#33ff33');
     } else if (theme === 'RED') {
       root.style.setProperty('--term-bg', '#000000');
-      root.style.setProperty('--term-fg', '#ff3333');
-      root.style.setProperty('--term-border', '#ff3333');
+      root.style.setProperty('--term-fg', '#cc0000');
+      root.style.setProperty('--term-border', '#cc0000');
     } else if (theme === 'WHITE') {
       root.style.setProperty('--term-bg', '#000000');
       root.style.setProperty('--term-fg', '#f4f4f4');
