@@ -1462,20 +1462,30 @@ function App() {
                             + ROUND
                         </button>
                     )}
-                    <button 
-                        className="osb-button" 
-                        onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
-                        style={{
-                            borderStyle: 'solid',
-                            cursor: calculation.valid ? 'pointer' : 'not-allowed',
-                            opacity: calculation.valid ? 1 : 0.6,
-                            background: calculation.valid 
-                                ? 'var(--term-bg)' 
-                                : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
-                        }}
-                    >
-                        FIRE
-                    </button>
+                    {fireStarts.length > 0 ? (
+                        <button 
+                            className="osb-button" 
+                            onClick={() => setFireStarts([])}
+                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', fontSize: '18px' }}
+                        >
+                            X
+                        </button>
+                    ) : (
+                        <button 
+                            className="osb-button" 
+                            onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
+                            style={{
+                                borderStyle: 'solid',
+                                cursor: calculation.valid ? 'pointer' : 'not-allowed',
+                                opacity: calculation.valid ? 1 : 0.6,
+                                background: calculation.valid 
+                                    ? 'var(--term-bg)' 
+                                    : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
+                            }}
+                        >
+                            FIRE
+                        </button>
+                    )}
                 </>
             ) : (
                 <>
@@ -1490,20 +1500,30 @@ function App() {
                             + ROUND
                         </button>
                     )}
-                    <button 
-                        className="osb-button" 
-                        onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
-                        style={{
-                            borderStyle: 'solid',
-                            cursor: calculation.valid ? 'pointer' : 'not-allowed',
-                            opacity: calculation.valid ? 1 : 0.5,
-                            background: calculation.valid 
-                                ? 'var(--term-bg)' 
-                                : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
-                        }}
-                    >
-                        FIRE
-                    </button>
+                    {fireStarts.length > 0 ? (
+                        <button 
+                            className="osb-button" 
+                            onClick={() => setFireStarts([])}
+                            style={{ borderStyle: 'solid', animation: 'blinker 1s linear infinite', fontSize: '18px' }}
+                        >
+                            X
+                        </button>
+                    ) : (
+                        <button 
+                            className="osb-button" 
+                            onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
+                            style={{
+                                borderStyle: 'solid',
+                                cursor: calculation.valid ? 'pointer' : 'not-allowed',
+                                opacity: calculation.valid ? 1 : 0.5,
+                                background: calculation.valid 
+                                    ? 'var(--term-bg)' 
+                                    : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
+                            }}
+                        >
+                            FIRE
+                        </button>
+                    )}
                 </>
             )}
         </div>
