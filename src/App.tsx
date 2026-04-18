@@ -620,13 +620,21 @@ function App() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      let mapFg = '#ffb000';
+      if (theme === 'GREEN') mapFg = '#33ff33';
+      else if (theme === 'RED') mapFg = '#cc0000';
+      else if (theme === 'WHITE') mapFg = '#f4f4f4';
+      
+      const mapFg40 = mapFg + '40';
+      const mapFg80 = mapFg + '80';
+
       const mapMeters = mapSize * 1000;
       
       // Clear
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       // 100m Sub-grid (Faint)
-      ctx.strokeStyle = '#ffbb0040';
+      ctx.strokeStyle = mapFg40;
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]); 
       ctx.beginPath();
@@ -645,7 +653,7 @@ function App() {
       ctx.stroke();
 
       // 1km Major grid (Solid)
-      ctx.strokeStyle = '#ffbb0080';
+      ctx.strokeStyle = mapFg80;
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -663,7 +671,7 @@ function App() {
       ctx.setLineDash([]);
 
       // Labels
-      ctx.fillStyle = '#ffbb00';
+      ctx.fillStyle = mapFg;
       ctx.font = '10px monospace';
       for (let x = start1000X; x <= mapOriginX + mapMeters; x += 1000) {
           const px = ((x - mapOriginX) / mapMeters) * canvas.width;
@@ -679,13 +687,13 @@ function App() {
           const px = ((x - mapOriginX) / mapMeters) * canvas.width;
           const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
           
-          ctx.strokeStyle = '#ffbb00';
+          ctx.strokeStyle = mapFg;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(px - 5, py); ctx.lineTo(px + 5, py);
           ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5);
           ctx.stroke();
-          ctx.fillStyle = '#ffbb00';
+          ctx.fillStyle = mapFg;
           ctx.fillText(label, px + 8, py - 8);
 
           const xStr = Math.round(x).toString().padStart(4, '0').slice(-4);
@@ -728,7 +736,7 @@ function App() {
           const minRPx = (minR / mapMeters) * canvas.width;
           const maxRPx = (maxR / mapMeters) * canvas.width;
           
-          ctx.strokeStyle = '#ffbb00';
+          ctx.strokeStyle = mapFg;
           ctx.lineWidth = 1;
           ctx.setLineDash([]);
 
@@ -764,7 +772,7 @@ function App() {
       if (isAdjusted) {
           tgtAdjPos = drawPoint(final_tx, final_ty, 'ADJ', tgtElevStr);
           if (tgtOrigPos && tgtAdjPos) {
-              ctx.strokeStyle = '#ffbb0080';
+              ctx.strokeStyle = mapFg80;
               ctx.setLineDash([2, 4]);
               ctx.beginPath();
               ctx.moveTo(tgtOrigPos.px, tgtOrigPos.py);
@@ -777,7 +785,7 @@ function App() {
       const activeTgtPos = tgtOrigPos;
 
       if (gunPos && activeTgtPos) {
-          ctx.strokeStyle = '#ffbb00';
+          ctx.strokeStyle = mapFg;
           ctx.setLineDash([5, 5]);
           ctx.beginPath();
           ctx.moveTo(gunPos.px, gunPos.py);
@@ -790,7 +798,7 @@ function App() {
               ctx.beginPath();
               ctx.setLineDash([2, 4]); 
               ctx.arc(activeTgtPos.px, activeTgtPos.py, Math.max(1, rPx), 0, 2 * Math.PI);
-              ctx.strokeStyle = '#ffbb00';
+              ctx.strokeStyle = mapFg;
               ctx.lineWidth = 1;
               ctx.stroke();
               ctx.setLineDash([]);
@@ -811,11 +819,11 @@ function App() {
                   ctx.beginPath();
                   ctx.setLineDash(blinkOn ? [] : [2, 4]); 
                   ctx.arc(tOrigPx, tOrigPy, Math.max(1, rPx), 0, 2 * Math.PI);
-                  ctx.strokeStyle = '#ffbb00';
+                  ctx.strokeStyle = mapFg;
                   ctx.lineWidth = blinkOn ? 3 : 1; 
                   ctx.stroke();
                   if (blinkOn) {
-                      ctx.fillStyle = '#ffbb0080';
+                      ctx.fillStyle = mapFg80;
                       ctx.fill();
                   }
                   ctx.setLineDash([]);
@@ -827,17 +835,17 @@ function App() {
                   ctx.beginPath();
                   ctx.arc(currentPx, currentPy, 4, 0, 2 * Math.PI);
                   if (blinkOn) {
-                      ctx.fillStyle = '#ffbb00';
+                      ctx.fillStyle = mapFg;
                       ctx.fill();
                   } else {
-                      ctx.strokeStyle = '#ffbb00';
+                      ctx.strokeStyle = mapFg;
                       ctx.lineWidth = 2;
                       ctx.stroke();
                   }
               }
           });
       }
-  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY]);
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY, theme]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!mapMode) return;
@@ -1379,7 +1387,7 @@ function App() {
                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)' }}>
                              <div style={{ minHeight: '22px' }}>
                                  {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-                                     <div style={{ color: '#ffbb00', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
+                                     <div style={{ color: 'var(--term-fg)', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
                                  )}
                              </div>
                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
