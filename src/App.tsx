@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { Peer } from 'peerjs';
 import './index.css';
 import enterInSnd from './assets/enter-in.wav';
 import enterOutSnd from './assets/enter-out.wav';
@@ -337,6 +338,11 @@ function App() {
   const [activeField, setActiveField] = useState<string | null>(null);
   const [justFocusedField, setJustFocusedField] = useState<string | null>(null);
 
+  const [linkCode, setLinkCode] = useState<string>('');
+  const [peerStatus, setPeerStatus] = useState<'OFFLINE' | 'WAITING' | 'CONNECTED' | 'HOSTING'>('OFFLINE');
+  const peerRef = useRef<Peer | null>(null);
+  const connRef = useRef<any | null>(null);
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'AMBER') {
@@ -372,6 +378,7 @@ function App() {
         if (activeField === 'windSpeed') setWindSpeed(updater);
         if (activeField === 'windDir') setWindDir(updater);
         if (activeField === 'charge') setForcedChargeStr(updater);
+        if (activeField === 'linkCode') setLinkCode(updater);
       };
 
       if (e.key === 'Backspace') {
@@ -386,19 +393,19 @@ function App() {
       }
       if (/^[0-9]$/.test(e.key)) {
           e.preventDefault();
-          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
+          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode };
           const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
           const nextVal = prevStr + e.key;
           let willTab = false;
           
-          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nextVal.length === 4) willTab = true;
+          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nextVal.length === 4) willTab = true;
           if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
           if (activeField === 'charge' && /^[1-5]$/.test(e.key)) willTab = true;
 
           updateVal(prev => {
               const base = justFocusedField === activeField ? '' : prev;
               const nv = base + e.key;
-              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
+              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
               if (activeField === 'charge') {
@@ -433,7 +440,10 @@ function App() {
           e.preventDefault();
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
           const idx = fields.indexOf(activeField);
-          if (idx !== -1) {
+          if (activeField === 'linkCode') {
+              setActiveField(null);
+              setJustFocusedField(null);
+          } else if (idx !== -1) {
               const nf = fields[(idx + 1) % fields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
@@ -446,7 +456,7 @@ function App() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr, justFocusedField]);
+  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr, justFocusedField, linkCode]);
 
   const handleKeypadPress = (val: string) => {
       if (!activeField) return;
@@ -460,6 +470,7 @@ function App() {
         if (activeField === 'windSpeed') setWindSpeed(updater);
         if (activeField === 'windDir') setWindDir(updater);
         if (activeField === 'charge') setForcedChargeStr(updater);
+        if (activeField === 'linkCode') setLinkCode(updater);
       };
       if (val === 'CLR') {
           updateVal(() => '');
@@ -474,7 +485,10 @@ function App() {
       } else if (val === 'NEXT') {
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
           const idx = fields.indexOf(activeField);
-          if (idx !== -1) {
+          if (activeField === 'linkCode') {
+                  setActiveField(null);
+                  setJustFocusedField(null);
+          } else if (idx !== -1) {
               const nf = fields[(idx + 1) % fields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
@@ -485,7 +499,10 @@ function App() {
       } else if (val === 'PREV') {
           const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
           const idx = fields.indexOf(activeField);
-          if (idx !== -1) {
+          if (activeField === 'linkCode') {
+                  setActiveField(null);
+                  setJustFocusedField(null);
+          } else if (idx !== -1) {
               const nf = fields[(idx - 1 + fields.length) % fields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
@@ -494,19 +511,19 @@ function App() {
               setJustFocusedField(null);
           }
       } else {
-          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr };
+          const currVals: Record<string, string> = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode };
           const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
           const nextVal = prevStr + val;
           let willTab = false;
           
-          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nextVal.length === 4) willTab = true;
+          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nextVal.length === 4) willTab = true;
           if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
           if (activeField === 'charge' && /^[1-5]$/.test(val)) willTab = true;
 
           updateVal(prev => {
               const base = justFocusedField === activeField ? '' : prev;
               const nv = base + val;
-              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev'].includes(activeField) && nv.length > 4) return prev;
+              if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
               if (activeField === 'charge') {
@@ -521,8 +538,11 @@ function App() {
           
           if (willTab) {
               const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-              const idx = fields.indexOf(activeField);
-              if (idx !== -1) {
+              let idx = fields.indexOf(activeField);
+              if (activeField === 'linkCode') {
+                  setActiveField(null);
+                  setJustFocusedField(null);
+               } else if (idx !== -1) {
                   const nf = fields[(idx + 1) % fields.length];
                   setActiveField(nf);
                   setJustFocusedField(nf);
@@ -585,6 +605,113 @@ function App() {
           </div>
       );
   };
+
+  // PeerJS Connection Syncing UseEffect
+  useEffect(() => {
+     if (linkCode.length === 4) {
+         if (linkCode === '0000') {
+             if (connRef.current) { connRef.current.close(); connRef.current = null; }
+             if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
+             setPeerStatus('OFFLINE');
+             return;
+         }
+
+         if (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING' || peerStatus === 'WAITING') return;
+
+         setPeerStatus('WAITING');
+         
+         const setupConnectionListeners = (conn: any) => {
+             conn.on('open', () => {
+                 setPeerStatus(conn.peer === `m777-${linkCode}-B` ? 'HOSTING' : 'CONNECTED');
+             });
+             conn.on('data', (data: any) => {
+                 if (data.type === 'SYNC') {
+                     if (data.gunX !== undefined) setGunX(data.gunX);
+                     if (data.gunY !== undefined) setGunY(data.gunY);
+                     if (data.tgtX !== undefined) setTgtX(data.tgtX);
+                     if (data.tgtY !== undefined) setTgtY(data.tgtY);
+                     if (data.gunElevStr !== undefined) setGunElevStr(data.gunElevStr);
+                     if (data.tgtElevStr !== undefined) setTgtElevStr(data.tgtElevStr);
+                     if (data.forcedChargeStr !== undefined) setForcedChargeStr(data.forcedChargeStr);
+                     if (data.windSpeed !== undefined) setWindSpeed(data.windSpeed);
+                     if (data.windDir !== undefined) setWindDir(data.windDir);
+                 }
+             });
+             conn.on('close', () => {
+                 setPeerStatus('OFFLINE');
+                 connRef.current = null;
+             });
+             conn.on('error', () => {
+                 setPeerStatus('OFFLINE');
+                 connRef.current = null;
+             });
+         };
+
+         // Attempt to connect as client first
+         const clientPeerId = `m777-${linkCode}-B-${Math.floor(Math.random()*1000)}`;
+         const peer = new Peer(clientPeerId);
+         peerRef.current = peer;
+
+         peer.on('open', () => {
+             const hostId = `m777-${linkCode}-A`;
+             const conn = peer.connect(hostId, { reliable: true });
+             
+             // Setup a timeout for connection
+             const connTimeout = setTimeout(() => {
+                 if (!connRef.current?.open && !connRef.current?.peerConnection) {
+                     // We couldn't connect to host, we must BE the host
+                     peer.destroy();
+                     const hostPeer = new Peer(hostId);
+                     peerRef.current = hostPeer;
+                     hostPeer.on('open', () => {
+                         setPeerStatus('HOSTING');
+                     });
+                     hostPeer.on('connection', (incomingConn) => {
+                         connRef.current = incomingConn;
+                         setupConnectionListeners(incomingConn);
+                     });
+         hostPeer.on('error', () => {
+                         setPeerStatus('OFFLINE');
+                     });
+                 }
+             }, 3000);
+
+             conn.on('open', () => {
+                 clearTimeout(connTimeout);
+                 connRef.current = conn;
+                 setupConnectionListeners(conn);
+             });
+             
+             conn.on('error', () => {
+                 // Handled by timeout above
+             });
+         });
+         
+         peer.on('error', () => {
+             // If ID is taken, we'll try again
+             setPeerStatus('OFFLINE');
+         });
+
+         return () => {
+             if (connRef.current) { connRef.current.close(); connRef.current = null; }
+             if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
+         };
+     } else {
+         if (connRef.current) { connRef.current.close(); connRef.current = null; }
+         if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
+         setPeerStatus('OFFLINE');
+     }
+  }, [linkCode]);
+
+  // Sync out changes
+  useEffect(() => {
+      if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
+          connRef.current.send({
+              type: 'SYNC',
+              gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir
+          });
+      }
+  }, [gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, peerStatus]);
 
 
   const [fireStarts, setFireStarts] = useState<{id: number, start: number, tof: number, tx: number, ty: number, disp: number}[]>([]);
@@ -1345,6 +1472,20 @@ function App() {
                     <button className="osb-button" onClick={() => setMapSize(prev => Math.max(1, prev - 1))}>- 1 KM²</button>
                 </>
             )}
+
+            <div style={{ marginTop: '30px' }} />
+            <button 
+                className={`osb-button ${activeField === 'linkCode' ? 'term-cursor-animate active' : ''}`} 
+                onClick={() => { setActiveField('linkCode'); setJustFocusedField('linkCode'); }}
+                style={{ position: 'relative' }}
+            >
+                LINK
+                <br />
+                {linkCode.padEnd(4, '—')}
+            </button>
+            <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '4px', letterSpacing: '1px', opacity: 0.8, color: peerStatus === 'OFFLINE' ? 'var(--term-fg)' : (peerStatus === 'CONNECTED' ? '#33ff33' : '#ffb000') }}>
+                {peerStatus}
+            </div>
 
             <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
