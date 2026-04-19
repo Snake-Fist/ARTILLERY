@@ -621,9 +621,9 @@ function App() {
          setPeerStatus('WAITING');
          
          const setupConnectionListeners = (conn: any) => {
-             conn.on('open', () => {
-                 setPeerStatus(conn.peer === `m777-${linkCode}-B` ? 'HOSTING' : 'CONNECTED');
-             });
+             const updateStatus = () => setPeerStatus('CONNECTED');
+             if (conn.open) updateStatus();
+             conn.on('open', updateStatus);
              conn.on('data', (data: any) => {
                  if (data.type === 'SYNC') {
                      if (data.gunX !== undefined) setGunX(data.gunX);
