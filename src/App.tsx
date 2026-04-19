@@ -674,8 +674,14 @@ function App() {
     let effectiveRange = r;
     let azFix = 0;
     
-    // Reverted to 0.48 (calculated from the 5k shot) for testing on latest web app
-    const aerodynamicK = 0.48;
+    // Adjust aerodynamic coefficients based on trajectory profile (Low Angle vs High Angle)
+    const v_h = r / baseTofInfo;
+    let crosswindK = 0.48;
+    let tailwindK = 0.86;
+    if (v_h < 100) {
+        crosswindK = 0.26;
+        tailwindK = 0.42;
+    }
     let wSpeed = parseFloat(windSpeed);
     let wDir = parseFloat(windDir);
     if (!isNaN(wSpeed) && !isNaN(wDir) && gridData) {
@@ -687,10 +693,16 @@ function App() {
         const tailwind = -wSpeed * Math.cos(relAngleRad);
         const crosswind = -wSpeed * Math.sin(relAngleRad);
         
-        const windRangeShift = tailwind * baseTofInfo * aerodynamicK;
+        const windRangeShift = tailwind * baseTofInfo * tailwindK;
         effectiveRange = Math.max(0, r - windRangeShift);
         
-        const crossOffset = crosswind * baseTofInfo * aerodynamicK;
+        // If wind drag pushed effective range out of current charge bounds, dynamically upgrade/downgrade!
+        if (forcedCharge === null && (effectiveRange < activeCharge.min || effectiveRange > activeCharge.max)) {
+            let newCharge = CHARGES.find(c => effectiveRange >= c.min && effectiveRange <= c.max);
+            if (newCharge) activeCharge = newCharge;
+        }
+        
+        const crossOffset = crosswind * baseTofInfo * crosswindK;
         const angularDeflectionRad = Math.atan2(crossOffset, r);
         azFix = -angularDeflectionRad * (6400 / (2 * Math.PI));
     }
