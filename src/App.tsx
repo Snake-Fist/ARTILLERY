@@ -706,10 +706,15 @@ function App() {
   // Sync out changes
   useEffect(() => {
       if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
-          connRef.current.send({
-              type: 'SYNC',
-              gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir
-          });
+          const timeout = setTimeout(() => {
+              if (connRef.current) {
+                  connRef.current.send({
+                      type: 'SYNC',
+                      gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir
+                  });
+              }
+          }, 200);
+          return () => clearTimeout(timeout);
       }
   }, [gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, peerStatus]);
 
