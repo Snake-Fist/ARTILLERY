@@ -1485,7 +1485,7 @@ function App() {
                   } else if (remaining > -3) {
                       const blinkOn = Math.floor(Date.now() / 250) % 2 === 0;
                       return (
-                          <div key={fs.id} style={{ padding: '5px 10px', background: blinkOn ? '#ffbb00' : 'var(--term-bg)', color: blinkOn ? '#000' : '#ffbb00', border: '1px solid #ffbb00', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
+                          <div key={fs.id} style={{ padding: '5px 10px', background: blinkOn ? 'var(--term-fg)' : 'var(--term-bg)', color: blinkOn ? 'var(--term-bg)' : 'var(--term-fg)', border: '1px solid var(--term-fg)', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
                               SPLASH
                           </div>
                       );
@@ -1529,7 +1529,7 @@ function App() {
                 <br />
                 {linkCode.padEnd(4, '—')}
             </button>
-            <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '4px', letterSpacing: '1px', opacity: 0.8, color: peerStatus === 'OFFLINE' ? 'var(--term-fg)' : (peerStatus === 'CONNECTED' ? '#33ff33' : '#ffb000') }}>
+            <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '4px', letterSpacing: '1px', opacity: peerStatus === 'OFFLINE' ? 0.5 : 1, color: 'var(--term-fg)' }}>
                 {peerStatus}
             </div>
 
