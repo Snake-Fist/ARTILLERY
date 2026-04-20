@@ -342,6 +342,7 @@ function App() {
   const [peerStatus, setPeerStatus] = useState<'OFFLINE' | 'WAITING' | 'CONNECTED' | 'HOSTING'>('OFFLINE');
   const peerRef = useRef<Peer | null>(null);
   const connRef = useRef<any | null>(null);
+  const lastReceivedSyncRef = useRef<any>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -626,6 +627,7 @@ function App() {
              conn.on('open', updateStatus);
              conn.on('data', (data: any) => {
                  if (data.type === 'SYNC') {
+                     lastReceivedSyncRef.current = data;
                      if (data.gunX !== undefined) setGunX(data.gunX);
                      if (data.gunY !== undefined) setGunY(data.gunY);
                      if (data.tgtX !== undefined) setTgtX(data.tgtX);
@@ -635,6 +637,16 @@ function App() {
                      if (data.forcedChargeStr !== undefined) setForcedChargeStr(data.forcedChargeStr);
                      if (data.windSpeed !== undefined) setWindSpeed(data.windSpeed);
                      if (data.windDir !== undefined) setWindDir(data.windDir);
+                 } else if (data.type === 'FIRE') {
+                     setFireStarts(prev => [...prev, {
+                         id: Date.now(),
+                         start: Date.now(),
+                         tof: data.payload.tof,
+                         tx: data.payload.tx,
+                         ty: data.payload.ty,
+                         disp: data.payload.disp
+                     }]);
+                     setNow(Date.now());
                  }
              });
              conn.on('close', () => {
@@ -708,6 +720,21 @@ function App() {
       if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
           const timeout = setTimeout(() => {
               if (connRef.current) {
+                  const last = lastReceivedSyncRef.current;
+                  if (last &&
+                      last.gunX === gunX &&
+                      last.gunY === gunY &&
+                      last.tgtX === tgtX &&
+                      last.tgtY === tgtY &&
+                      last.gunElevStr === gunElevStr &&
+                      last.tgtElevStr === tgtElevStr &&
+                      last.forcedChargeStr === forcedChargeStr &&
+                      last.windSpeed === windSpeed &&
+                      last.windDir === windDir
+                  ) {
+                      return; // Do not echo back the exact state we just received
+                  }
+
                   connRef.current.send({
                       type: 'SYNC',
                       gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir
@@ -1416,15 +1443,29 @@ function App() {
           t_y += parseFloat(adjN || '0') - parseFloat(adjS || '0');
       }
 
-      setFireStarts(prev => [...prev, {
+      const newFire = {
           id: Date.now(),
           start: Date.now(),
           tof: calculation.tof,
           tx: t_x || 0,
           ty: t_y || 0,
           disp: calculation.dispersion || 0
-      }]);
+      };
+
+      setFireStarts(prev => [...prev, newFire]);
       setNow(Date.now());
+      
+      if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
+          connRef.current.send({
+              type: 'FIRE',
+              payload: {
+                  tof: newFire.tof,
+                  tx: newFire.tx,
+                  ty: newFire.ty,
+                  disp: newFire.disp
+              }
+          });
+      }
     }
   };
 
