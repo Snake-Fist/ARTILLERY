@@ -343,6 +343,7 @@ function App() {
   const peerRef = useRef<Peer | null>(null);
   const connRef = useRef<any | null>(null);
   const lastReceivedSyncRef = useRef<any>(null);
+  const lastEditedRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const root = document.documentElement;
@@ -369,7 +370,10 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeField) return;
       
+      const markEdited = () => { lastEditedRef.current[activeField] = Date.now(); };
+      
       const updateVal = (updater: (prev: string) => string) => {
+        markEdited();
         if (activeField === 'gunX') setGunX(updater);
         if (activeField === 'gunY') setGunY(updater);
         if (activeField === 'tgtX') setTgtX(updater);
@@ -461,7 +465,11 @@ function App() {
 
   const handleKeypadPress = (val: string) => {
       if (!activeField) return;
+
+      const markEdited = () => { lastEditedRef.current[activeField] = Date.now(); };
+
       const updateVal = (updater: (prev: string) => string) => {
+        markEdited();
         if (activeField === 'gunX') setGunX(updater);
         if (activeField === 'gunY') setGunY(updater);
         if (activeField === 'tgtX') setTgtX(updater);
@@ -628,15 +636,17 @@ function App() {
              conn.on('data', (data: any) => {
                  if (data.type === 'SYNC') {
                      lastReceivedSyncRef.current = data;
-                     if (data.gunX !== undefined) setGunX(data.gunX);
-                     if (data.gunY !== undefined) setGunY(data.gunY);
-                     if (data.tgtX !== undefined) setTgtX(data.tgtX);
-                     if (data.tgtY !== undefined) setTgtY(data.tgtY);
-                     if (data.gunElevStr !== undefined) setGunElevStr(data.gunElevStr);
-                     if (data.tgtElevStr !== undefined) setTgtElevStr(data.tgtElevStr);
-                     if (data.forcedChargeStr !== undefined) setForcedChargeStr(data.forcedChargeStr);
-                     if (data.windSpeed !== undefined) setWindSpeed(data.windSpeed);
-                     if (data.windDir !== undefined) setWindDir(data.windDir);
+                     const now = Date.now();
+                     const m = lastEditedRef.current;
+                     if (data.gunX !== undefined && now - (m['gunX'] || 0) > 1500) setGunX(data.gunX);
+                     if (data.gunY !== undefined && now - (m['gunY'] || 0) > 1500) setGunY(data.gunY);
+                     if (data.tgtX !== undefined && now - (m['tgtX'] || 0) > 1500) setTgtX(data.tgtX);
+                     if (data.tgtY !== undefined && now - (m['tgtY'] || 0) > 1500) setTgtY(data.tgtY);
+                     if (data.gunElevStr !== undefined && now - (m['gunElev'] || 0) > 1500) setGunElevStr(data.gunElevStr);
+                     if (data.tgtElevStr !== undefined && now - (m['tgtElev'] || 0) > 1500) setTgtElevStr(data.tgtElevStr);
+                     if (data.forcedChargeStr !== undefined && now - (m['charge'] || 0) > 1500) setForcedChargeStr(data.forcedChargeStr);
+                     if (data.windSpeed !== undefined && now - (m['windSpeed'] || 0) > 1500) setWindSpeed(data.windSpeed);
+                     if (data.windDir !== undefined && now - (m['windDir'] || 0) > 1500) setWindDir(data.windDir);
                  } else if (data.type === 'FIRE') {
                      setFireStarts(prev => [...prev, {
                          id: Date.now(),
