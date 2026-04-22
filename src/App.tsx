@@ -344,6 +344,10 @@ function App() {
   const connRef = useRef<any | null>(null);
   const lastReceivedSyncRef = useRef<any>(null);
   const lastEditedRef = useRef<Record<string, number>>({});
+  const isHostRef = useRef<boolean>(false);
+  const latestStateRef = useRef<any>({});
+  
+  latestStateRef.current = { gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir };
 
   useEffect(() => {
     const root = document.documentElement;
@@ -630,7 +634,15 @@ function App() {
          setPeerStatus('WAITING');
          
          const setupConnectionListeners = (conn: any) => {
-             const updateStatus = () => setPeerStatus('CONNECTED');
+             const updateStatus = () => {
+                 setPeerStatus('CONNECTED');
+                 if (isHostRef.current && conn.open) {
+                     conn.send({
+                         type: 'SYNC',
+                         ...latestStateRef.current
+                     });
+                 }
+             };
              if (conn.open) updateStatus();
              conn.on('open', updateStatus);
              conn.on('data', (data: any) => {
@@ -673,6 +685,7 @@ function App() {
          const clientPeerId = `m777-${linkCode}-B-${Math.floor(Math.random()*1000)}`;
          const peer = new Peer(clientPeerId);
          peerRef.current = peer;
+         isHostRef.current = false;
 
          peer.on('open', () => {
              const hostId = `m777-${linkCode}-A`;
@@ -685,6 +698,7 @@ function App() {
                      peer.destroy();
                      const hostPeer = new Peer(hostId);
                      peerRef.current = hostPeer;
+                     isHostRef.current = true;
                      hostPeer.on('open', () => {
                          setPeerStatus('HOSTING');
                      });
@@ -843,14 +857,10 @@ function App() {
     let effectiveRange = r;
     let azFix = 0;
     
-    // Adjust aerodynamic coefficients based on trajectory profile (Low Angle vs High Angle)
-    const v_h = r / baseTofInfo;
-    let crosswindK = 0.48;
-    let tailwindK = 0.86;
-    if (v_h < 100) {
-        crosswindK = 0.26;
-        tailwindK = 0.42;
-    }
+    // Field tests demonstrate drag is linear in the engine.
+    // Using an empirically verified constant drag coefficient for this projectile:
+    let crosswindK = 0.46;
+    let tailwindK = 0.46;
     let wSpeed = parseFloat(windSpeed);
     let wDir = parseFloat(windDir);
     if (!isNaN(wSpeed) && !isNaN(wDir) && gridData) {
