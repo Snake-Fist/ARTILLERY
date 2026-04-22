@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Peer } from 'peerjs';
 import './index.css';
 import enterInSnd from './assets/enter-in.wav';
@@ -349,7 +349,11 @@ function App() {
   const [forcedChargeStr, setForcedChargeStr] = useState<string>('');
   const forcedCharge = forcedChargeStr === '' ? null : parseInt(forcedChargeStr);
   
-  const [mapSize, setMapSize] = useState<number>(10);
+  const [isDelayOn, setIsDelayOn] = useState(false);
+  const [fireDelayEnd, setFireDelayEnd] = useState<number | null>(null);
+
+  const [baseMapSize, setBaseMapSize] = useState<number>(10);
+  const [fitMapSize, setFitMapSize] = useState<number>(10);
   const [showMapSizeControls, setShowMapSizeControls] = useState<boolean>(false);
   const [mapOriginX, setMapOriginX] = useState<number>(0);
   const [mapOriginY, setMapOriginY] = useState<number>(0);
@@ -357,8 +361,15 @@ function App() {
 
   const [theme, setTheme] = useState<'AMBER' | 'GREEN' | 'RED' | 'WHITE'>('AMBER');
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
+
+  const mapSize = zoomMode === 'FIT' ? fitMapSize : 
+                  zoomMode === '2X' ? baseMapSize / 2 : 
+                  zoomMode === '4X' ? baseMapSize / 4 : 
+                  zoomMode === '8X' ? baseMapSize / 8 : 
+                  baseMapSize;
+
   const [dpadMode, setDpadMode] = useState<'GUN' | 'TGT' | 'ADJUST' | 'PAN'>('TGT');
-  const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS' | 'SPOTTER'>('MAP');
+  const [activePage, setActivePage] = useState<'COORDS' | 'MAP' | 'SETTINGS' | 'SPOTTER' | 'GUNNER'>('MAP');
   const [cursorPos, setCursorPos] = useState<{clientPx: number, clientPy: number, coord: string} | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -372,13 +383,14 @@ function App() {
   const [linkCode, setLinkCode] = useState<string>('');
   const [peerStatus, setPeerStatus] = useState<'OFFLINE' | 'WAITING' | 'CONNECTED' | 'HOSTING'>('OFFLINE');
   const peerRef = useRef<Peer | null>(null);
-  const connRef = useRef<any | null>(null);
+  const connsRef = useRef<any[]>([]);
+  const [connCount, setConnCount] = useState(0);
   const lastReceivedSyncRef = useRef<any>(null);
   const lastEditedRef = useRef<Record<string, number>>({});
   const isHostRef = useRef<boolean>(false);
   const latestStateRef = useRef<any>({});
   
-  latestStateRef.current = { gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir };
+  latestStateRef.current = { gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, spotterTargets };
 
   useEffect(() => {
     const root = document.documentElement;
@@ -419,7 +431,22 @@ function App() {
         if (activeField === 'windDir') setWindDir(updater);
         if (activeField === 'charge') setForcedChargeStr(updater);
         if (activeField === 'linkCode') setLinkCode(updater);
+        if (activeField && activeField.startsWith('spot')) {
+            const i = parseInt(activeField.charAt(4));
+            const field = activeField.substring(5).toLowerCase();
+            setSpotterTargets(prev => ({
+                ...prev,
+                [i]: {
+                    ...(prev[i]||{x:'',y:'',alt:''}),
+                    [field]: updater((prev[i] as any)?.[field] || '')
+                }
+            }));
+        }
       };
+
+      const isSpot = activeField && activeField.startsWith('spot');
+      const spotFields = [1,2,3,4,5,6,7,8,9].flatMap(i => [`spot${i}X`, `spot${i}Y`, `spot${i}Alt`]);
+      const tabFields = isSpot ? spotFields : ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
 
       if (e.key === 'Backspace') {
           e.preventDefault();
@@ -433,11 +460,20 @@ function App() {
       }
       if (/^[0-9]$/.test(e.key)) {
           e.preventDefault();
-          const currVals: any = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode, spotterTargets };
-          const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
+          const currVals: any = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode };
+          let prevStr = '';
+          if (isSpot) {
+              const i = parseInt(activeField.charAt(4));
+              const field = activeField.substring(5).toLowerCase();
+              prevStr = (spotterTargets[i] as any)?.[field] || '';
+          } else {
+              prevStr = currVals[activeField] || '';
+          }
+          prevStr = justFocusedField === activeField ? '' : prevStr;
           const nextVal = prevStr + e.key;
           let willTab = false;
           
+          if (isSpot && nextVal.length === 4) willTab = true;
           if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nextVal.length === 4) willTab = true;
           if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
           if (activeField === 'charge' && /^[1-5]$/.test(e.key)) willTab = true;
@@ -445,6 +481,10 @@ function App() {
           updateVal(prev => {
               const base = justFocusedField === activeField ? '' : prev;
               const nv = base + e.key;
+              if (isSpot) {
+                  if (nv.length > 4) return prev;
+                  return nv;
+              }
               if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
@@ -459,10 +499,9 @@ function App() {
           if (justFocusedField === activeField) setJustFocusedField(null);
           
           if (willTab) {
-              const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-              const idx = fields.indexOf(activeField);
+              const idx = tabFields.indexOf(activeField);
               if (idx !== -1) {
-                  const nf = fields[(idx + 1) % fields.length];
+                  const nf = tabFields[(idx + 1) % tabFields.length];
                   setActiveField(nf);
                   setJustFocusedField(nf);
               }
@@ -478,13 +517,13 @@ function App() {
       }
       if (e.key === 'Enter' || e.code === 'Space' || e.key === 'Tab') {
           e.preventDefault();
-          const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-          const idx = fields.indexOf(activeField);
+          const idx = tabFields.indexOf(activeField);
           if (activeField === 'linkCode') {
               setActiveField(null);
               setJustFocusedField(null);
           } else if (idx !== -1) {
-              const nf = fields[(idx + 1) % fields.length];
+              const dir = e.shiftKey ? -1 : 1;
+              const nf = tabFields[(idx + dir + tabFields.length) % tabFields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
           } else {
@@ -496,7 +535,7 @@ function App() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr, justFocusedField, linkCode]);
+  }, [activeField, gunX, gunY, gunElevStr, tgtX, tgtY, tgtElevStr, windSpeed, windDir, forcedChargeStr, justFocusedField, linkCode, spotterTargets]);
 
   const handleKeypadPress = (val: string) => {
       
@@ -518,6 +557,14 @@ function App() {
         markEdited();
         if (activeField === 'gunX') setGunX(updater);
         if (activeField === 'gunY') setGunY(updater);
+        if (activeField === 'tgtX') setTgtX(updater);
+        if (activeField === 'tgtY') setTgtY(updater);
+        if (activeField === 'gunElev') setGunElevStr(updater);
+        if (activeField === 'tgtElev') setTgtElevStr(updater);
+        if (activeField === 'windSpeed') setWindSpeed(updater);
+        if (activeField === 'windDir') setWindDir(updater);
+        if (activeField === 'charge') setForcedChargeStr(updater);
+        if (activeField === 'linkCode') setLinkCode(updater);
         if (activeField && activeField.startsWith('spot')) {
             const i = parseInt(activeField.charAt(4));
             const field = activeField.substring(5).toLowerCase();
@@ -529,15 +576,12 @@ function App() {
                 }
             }));
         }
-        if (activeField === 'tgtX') setTgtX(updater);
-        if (activeField === 'tgtY') setTgtY(updater);
-        if (activeField === 'gunElev') setGunElevStr(updater);
-        if (activeField === 'tgtElev') setTgtElevStr(updater);
-        if (activeField === 'windSpeed') setWindSpeed(updater);
-        if (activeField === 'windDir') setWindDir(updater);
-        if (activeField === 'charge') setForcedChargeStr(updater);
-        if (activeField === 'linkCode') setLinkCode(updater);
       };
+
+      const isSpot = activeField && activeField.startsWith('spot');
+      const spotFields = [1,2,3,4,5,6,7,8,9].flatMap(i => [`spot${i}X`, `spot${i}Y`, `spot${i}Alt`]);
+      const tabFields = isSpot ? spotFields : ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
+
       if (val === 'CLR') {
           updateVal(() => '');
           if (justFocusedField === activeField) setJustFocusedField(null);
@@ -549,14 +593,12 @@ function App() {
               updateVal(prev => prev.slice(0, -1));
           }
       } else if (val === 'NEXT') {
-          const isSpot = activeField && activeField.startsWith('spot');
-          const fields = isSpot ? [] : ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-          const idx = fields.indexOf(activeField);
+          const idx = tabFields.indexOf(activeField);
           if (activeField === 'linkCode') {
                   setActiveField(null);
                   setJustFocusedField(null);
           } else if (idx !== -1) {
-              const nf = fields[(idx + 1) % fields.length];
+              const nf = tabFields[(idx + 1) % tabFields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
           } else {
@@ -564,14 +606,12 @@ function App() {
               setJustFocusedField(null);
           }
       } else if (val === 'PREV') {
-          const isSpot = activeField && activeField.startsWith('spot');
-          const fields = isSpot ? [] : ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-          const idx = fields.indexOf(activeField);
+          const idx = tabFields.indexOf(activeField);
           if (activeField === 'linkCode') {
                   setActiveField(null);
                   setJustFocusedField(null);
           } else if (idx !== -1) {
-              const nf = fields[(idx - 1 + fields.length) % fields.length];
+              const nf = tabFields[(idx - 1 + tabFields.length) % tabFields.length];
               setActiveField(nf);
               setJustFocusedField(nf);
           } else {
@@ -579,21 +619,31 @@ function App() {
               setJustFocusedField(null);
           }
       } else {
-          const currVals: any = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode, spotterTargets };
-          const prevStr = justFocusedField === activeField ? '' : (currVals[activeField] || '');
+          const currVals: any = { gunX, gunY, gunElev: gunElevStr, tgtX, tgtY, tgtElev: tgtElevStr, windSpeed, windDir, charge: forcedChargeStr, linkCode };
+          let prevStr = '';
+          if (isSpot) {
+              const i = parseInt(activeField.charAt(4));
+              const field = activeField.substring(5).toLowerCase();
+              prevStr = (spotterTargets[i] as any)?.[field] || '';
+          } else {
+              prevStr = currVals[activeField] || '';
+          }
+          prevStr = justFocusedField === activeField ? '' : prevStr;
           const nextVal = prevStr + val;
           let willTab = false;
           
-          const isSpot = activeField && activeField.startsWith('spot');
-          
-          if (isSpot || (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nextVal.length === 4)) willTab = true;
+          if (isSpot && nextVal.length === 4) willTab = true;
+          if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nextVal.length === 4) willTab = true;
           if (activeField === 'windDir' && nextVal.length === 3) willTab = true;
           if (activeField === 'charge' && /^[1-5]$/.test(val)) willTab = true;
 
           updateVal(prev => {
               const base = justFocusedField === activeField ? '' : prev;
               const nv = base + val;
-              if (isSpot) return nv;
+              if (isSpot) {
+                  if (nv.length > 4) return prev;
+                  return nv;
+              }
               if (['gunX', 'gunY', 'tgtX', 'tgtY', 'gunElev', 'tgtElev', 'linkCode'].includes(activeField) && nv.length > 4) return prev;
               if (activeField === 'windSpeed' && parseFloat(nv) > 15) return '15';
               if (activeField === 'windDir' && parseFloat(nv) > 360) return '360';
@@ -608,13 +658,12 @@ function App() {
           if (justFocusedField === activeField) setJustFocusedField(null);
           
           if (willTab) {
-              const fields = ['gunX', 'gunY', 'gunElev', 'tgtX', 'tgtY', 'tgtElev', 'windSpeed', 'windDir', 'charge'];
-              let idx = fields.indexOf(activeField);
+              let idx = tabFields.indexOf(activeField);
               if (activeField === 'linkCode') {
                   setActiveField(null);
                   setJustFocusedField(null);
                } else if (idx !== -1) {
-                  const nf = fields[(idx + 1) % fields.length];
+                  const nf = tabFields[(idx + 1) % tabFields.length];
                   setActiveField(nf);
                   setJustFocusedField(nf);
               }
@@ -622,8 +671,15 @@ function App() {
       }
   };
 
-  const TerminalField = ({ id, label, val }: {id: string, label: string, val: string}) => {
+  const TerminalField = ({ id, label, val, hideLabel }: {id: string, label: string, val: string, hideLabel?: boolean}) => {
+      const elRef = useRef<HTMLDivElement>(null);
       const isActive = activeField === id;
+      
+      useEffect(() => {
+          if (isActive && elRef.current) {
+              elRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+      }, [isActive]);
       
       const strVal = String(val === '' || val === undefined || val === null ? '-' : val);
       const chars = strVal.padStart(4, ' ').slice(-4);
@@ -664,10 +720,11 @@ function App() {
 
       return (
           <div 
-              style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }}
+              ref={elRef}
+              style={{ display: 'flex', justifyContent: hideLabel ? 'center' : 'space-between', gap: '8px', cursor: 'pointer', flex: hideLabel ? 1 : undefined }}
               onClick={() => { setActiveField(id); setJustFocusedField(id); }}
           >
-              <span style={{ fontSize: '14px', width: '70px', lineHeight: '14px' }}>{label}</span>
+              {!hideLabel && <span style={{ fontSize: '14px', width: '70px', lineHeight: '14px' }}>{label}</span>}
               <div style={{ display: 'flex', alignItems: 'center' }}>
                   <div style={{ fontSize: '14px', lineHeight: '14px', color: 'var(--term-bg)', backgroundColor: 'var(--term-fg)', fontWeight: 'bold', display: 'flex', justifyContent: 'flex-start' }}>
                       {slots}
@@ -681,7 +738,9 @@ function App() {
   useEffect(() => {
      if (linkCode.length === 4) {
          if (linkCode === '0000') {
-             if (connRef.current) { connRef.current.close(); connRef.current = null; }
+             connsRef.current.forEach(c => c.close());
+             connsRef.current = [];
+             setConnCount(0);
              if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
              setPeerStatus('OFFLINE');
              return;
@@ -699,12 +758,17 @@ function App() {
                          type: 'SYNC',
                          ...latestStateRef.current
                      });
+                     connsRef.current.forEach(c => {
+                         if (c.open) c.send({ type: 'PEER_COUNT', count: connsRef.current.length });
+                     });
                  }
              };
              if (conn.open) updateStatus();
              conn.on('open', updateStatus);
              conn.on('data', (data: any) => {
-                 if (data.type === 'SYNC') {
+                 if (data.type === 'PEER_COUNT') {
+                     if (!isHostRef.current) setConnCount(data.count);
+                 } else if (data.type === 'SYNC') {
                      lastReceivedSyncRef.current = data;
                      const now = Date.now();
                      const m = lastEditedRef.current;
@@ -718,25 +782,55 @@ function App() {
                      if (data.windSpeed !== undefined && now - (m['windSpeed'] || 0) > 1500) setWindSpeed(data.windSpeed);
                      if (data.windDir !== undefined && now - (m['windDir'] || 0) > 1500) setWindDir(data.windDir);
                      if (data.spotterTargets !== undefined && now - (m['spotterTargets'] || 0) > 1500) setSpotterTargets(data.spotterTargets);
+                     
+                     if (isHostRef.current) {
+                         connsRef.current.forEach(c => {
+                             if (c.open && c !== conn) c.send(data);
+                         });
+                     }
                  } else if (data.type === 'FIRE') {
                      setFireStarts(prev => [...prev, {
-                         id: Date.now(),
-                         start: Date.now(),
+                         id: data.payload.id || Date.now(),
+                         start: data.payload.start || Date.now(),
                          tof: data.payload.tof,
                          tx: data.payload.tx,
                          ty: data.payload.ty,
                          disp: data.payload.disp
                      }]);
                      setNow(Date.now());
+                     if (isHostRef.current) {
+                         connsRef.current.forEach(c => {
+                             if (c.open && c !== conn) c.send(data);
+                         });
+                     }
+                 } else if (data.type === 'CANCEL_FIRE') {
+                     setFireStarts([]);
+                     if (isHostRef.current) {
+                         connsRef.current.forEach(c => {
+                             if (c.open && c !== conn) c.send(data);
+                         });
+                     }
                  }
              });
              conn.on('close', () => {
-                 setPeerStatus('OFFLINE');
-                 connRef.current = null;
+                 connsRef.current = connsRef.current.filter(c => c !== conn);
+                 setConnCount(connsRef.current.length);
+                 if (isHostRef.current) {
+                     connsRef.current.forEach(c => {
+                         if (c.open) c.send({ type: 'PEER_COUNT', count: connsRef.current.length });
+                     });
+                 }
+                 if (connsRef.current.length === 0) setPeerStatus(isHostRef.current ? 'HOSTING' : 'OFFLINE');
              });
              conn.on('error', () => {
-                 setPeerStatus('OFFLINE');
-                 connRef.current = null;
+                 connsRef.current = connsRef.current.filter(c => c !== conn);
+                 setConnCount(connsRef.current.length);
+                 if (isHostRef.current) {
+                     connsRef.current.forEach(c => {
+                         if (c.open) c.send({ type: 'PEER_COUNT', count: connsRef.current.length });
+                     });
+                 }
+                 if (connsRef.current.length === 0) setPeerStatus(isHostRef.current ? 'HOSTING' : 'OFFLINE');
              });
          };
 
@@ -752,7 +846,7 @@ function App() {
              
              // Setup a timeout for connection
              const connTimeout = setTimeout(() => {
-                 if (!connRef.current?.open && !connRef.current?.peerConnection) {
+                 if (!conn.open) {
                      // We couldn't connect to host, we must BE the host
                      peer.destroy();
                      const hostPeer = new Peer(hostId);
@@ -762,10 +856,11 @@ function App() {
                          setPeerStatus('HOSTING');
                      });
                      hostPeer.on('connection', (incomingConn) => {
-                         connRef.current = incomingConn;
+                         connsRef.current.push(incomingConn);
+                         setConnCount(connsRef.current.length);
                          setupConnectionListeners(incomingConn);
                      });
-         hostPeer.on('error', () => {
+                     hostPeer.on('error', () => {
                          setPeerStatus('OFFLINE');
                      });
                  }
@@ -773,7 +868,8 @@ function App() {
 
              conn.on('open', () => {
                  clearTimeout(connTimeout);
-                 connRef.current = conn;
+                 connsRef.current = [conn];
+                 setConnCount(1);
                  setupConnectionListeners(conn);
              });
              
@@ -788,11 +884,15 @@ function App() {
          });
 
          return () => {
-             if (connRef.current) { connRef.current.close(); connRef.current = null; }
+             connsRef.current.forEach(c => c.close());
+             connsRef.current = [];
+             setConnCount(0);
              if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
          };
      } else {
-         if (connRef.current) { connRef.current.close(); connRef.current = null; }
+         connsRef.current.forEach(c => c.close());
+         connsRef.current = [];
+         setConnCount(0);
          if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
          setPeerStatus('OFFLINE');
      }
@@ -800,34 +900,37 @@ function App() {
 
   // Sync out changes
   useEffect(() => {
-      if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
+      if (connsRef.current.length > 0 && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
           const timeout = setTimeout(() => {
-              if (connRef.current) {
-                  const last = lastReceivedSyncRef.current;
-                  if (last &&
-                      last.gunX === gunX &&
-                      last.gunY === gunY &&
-                      last.tgtX === tgtX &&
-                      last.tgtY === tgtY &&
-                      last.gunElevStr === gunElevStr &&
-                      last.tgtElevStr === tgtElevStr &&
-                      last.forcedChargeStr === forcedChargeStr &&
-                      last.windSpeed === windSpeed &&
-                      last.windDir === windDir &&
-                      JSON.stringify(last.spotterTargets) === JSON.stringify(spotterTargets)
-                  ) {
-                      return; // Do not echo back the exact state we just received
-                  }
-
-                  connRef.current.send({
-                      type: 'SYNC',
-                      gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, spotterTargets
-                  });
+              const last = lastReceivedSyncRef.current;
+              if (last &&
+                  last.gunX === gunX &&
+                  last.gunY === gunY &&
+                  last.tgtX === tgtX &&
+                  last.tgtY === tgtY &&
+                  last.gunElevStr === gunElevStr &&
+                  last.tgtElevStr === tgtElevStr &&
+                  last.forcedChargeStr === forcedChargeStr &&
+                  last.windSpeed === windSpeed &&
+                  last.windDir === windDir &&
+                  JSON.stringify(last.spotterTargets) === JSON.stringify(spotterTargets)
+              ) {
+                  lastReceivedSyncRef.current = null;
+                  return; // Do not echo back the exact state we just received
               }
+
+              connsRef.current.forEach(conn => {
+                  if (conn.open) {
+                      conn.send({
+                          type: 'SYNC',
+                          gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, spotterTargets
+                      });
+                  }
+              });
           }, 200);
           return () => clearTimeout(timeout);
       }
-  }, [gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, peerStatus]);
+  }, [gunX, gunY, tgtX, tgtY, gunElevStr, tgtElevStr, forcedChargeStr, windSpeed, windDir, peerStatus, spotterTargets]);
 
 
   const [fireStarts, setFireStarts] = useState<{id: number, start: number, tof: number, tx: number, ty: number, disp: number}[]>([]);
@@ -1047,6 +1150,8 @@ const gunElevAlt = parseFloat(gunElevStr);
           ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5);
           ctx.stroke();
           ctx.fillStyle = mapFg;
+          ctx.textAlign = 'left';
+          ctx.font = '10px "TX02", monospace';
           ctx.fillText(label, px + 8, py - 8);
 
           const xStr = Math.round(x).toString().padStart(4, '0').slice(-4);
@@ -1144,18 +1249,22 @@ const gunElevAlt = parseFloat(gunElevStr);
               const py = Math.floor(canvas.height - ((sy - mapOriginY) / mapMeters) * canvas.height) + 0.5;
               
               if (px >= 0 && px <= canvas.width && py >= 0 && py <= canvas.height) {
-                  ctx.lineWidth = 1.0;
-                  ctx.strokeStyle = mapFg;
-                  ctx.beginPath();
-                  ctx.moveTo(px - 10, py); ctx.lineTo(px + 10, py);
-                  ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10);
-                  ctx.stroke();
+                  const isLocked = st.x.padStart(4, '0') === tgtX.padStart(4, '0') && st.y.padStart(4, '0') === tgtY.padStart(4, '0');
+                  
+                  if (!isLocked) {
+                      ctx.lineWidth = 1.0;
+                      ctx.strokeStyle = mapFg;
+                      ctx.beginPath();
+                      ctx.moveTo(px - 6, py - 6); ctx.lineTo(px + 6, py + 6);
+                      ctx.moveTo(px - 6, py + 6); ctx.lineTo(px + 6, py - 6);
+                      ctx.stroke();
+                  }
                   
                   ctx.fillStyle = mapFg;
-                  ctx.textAlign = 'left';
+                  ctx.textAlign = 'right';
                   ctx.textBaseline = 'bottom';
                   ctx.font = '10px "TX02", monospace';
-                  ctx.fillText(`T${i}`, px + 6, py - 6);
+                  ctx.fillText(`T${i}`, px - 6, py - 6);
               }
           }
       }
@@ -1252,7 +1361,7 @@ const gunElevAlt = parseFloat(gunElevStr);
               }
           });
       }
-  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY, theme]);
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY, theme, spotterTargets]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!mapMode) return;
@@ -1268,9 +1377,10 @@ const gunElevAlt = parseFloat(gunElevStr);
       const py = yPx * scaleY;
       
       const mapMeters = mapSize * 1000;
-      let coordX = Math.round((px / canvas.width) * mapMeters) + mapOriginX;
-      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY;
+      let coordX = Math.round(((px / canvas.width) * mapMeters) + mapOriginX);
+      let coordY = Math.round((((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY);
       
+      let snappedAlt = '';
       // Snap to nearest spotter target within 100m
       for (let i = 1; i <= 9; i++) {
           const st = spotterTargets[i];
@@ -1280,6 +1390,7 @@ const gunElevAlt = parseFloat(gunElevStr);
               if (Math.hypot(coordX - sx, coordY - sy) <= 100) {
                   coordX = sx;
                   coordY = sy;
+                  snappedAlt = st.alt || '';
                   break;
               }
           }
@@ -1290,14 +1401,21 @@ const gunElevAlt = parseFloat(gunElevStr);
       const xStr = coordX.toString().padStart(4, '0');
       const yStr = coordY.toString().padStart(4, '0');
       
+      lastEditedRef.current['tgtX'] = Date.now();
+      lastEditedRef.current['tgtY'] = Date.now();
+      lastEditedRef.current['gunX'] = Date.now();
+      lastEditedRef.current['gunY'] = Date.now();
+      
       if (mapMode === 'gun') {
           setGunX(xStr);
           setGunY(yStr);
+          if (snappedAlt) setGunElevStr(snappedAlt);
           setMapMode(null);
           
       } else if (mapMode === 'tgt') {
           setTgtX(xStr);
           setTgtY(yStr);
+          if (snappedAlt) setTgtElevStr(snappedAlt);
           setMapMode(null);
           
       }
@@ -1318,8 +1436,8 @@ const gunElevAlt = parseFloat(gunElevStr);
       const py = yPx * scaleY;
       
       const mapMeters = mapSize * 1000;
-      let coordX = Math.round((px / canvas.width) * mapMeters) + mapOriginX;
-      let coordY = Math.round(((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY;
+      let coordX = Math.round(((px / canvas.width) * mapMeters) + mapOriginX);
+      let coordY = Math.round((((canvas.height - py) / canvas.height) * mapMeters) + mapOriginY);
       
       let snapped = false;
       for (let i = 1; i <= 9; i++) {
@@ -1356,7 +1474,6 @@ const gunElevAlt = parseFloat(gunElevStr);
   const handleZoomFit = () => {
       if (zoomMode === 'FIT') {
           setZoomMode('OFF');
-          setMapSize(10);
           setMapOriginX(0);
           setMapOriginY(0);
           return;
@@ -1385,14 +1502,14 @@ const gunElevAlt = parseFloat(gunElevStr);
       const reqMeters = Math.max(deltaX, deltaY, 1000);
       
       const newMapSize = Math.ceil(reqMeters / 1000);
-      setMapSize(newMapSize);
+      setFitMapSize(newMapSize);
       setZoomMode('FIT');
       
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
       
-      setMapOriginX(Math.max(0, centerX - (newMapSize * 1000) / 2));
-      setMapOriginY(Math.max(0, centerY - (newMapSize * 1000) / 2));
+      setMapOriginX(Math.max(0, Math.round(centerX - (newMapSize * 1000) / 2)));
+      setMapOriginY(Math.max(0, Math.round(centerY - (newMapSize * 1000) / 2)));
   };
   
   const handleCycleZoom = () => {
@@ -1400,25 +1517,27 @@ const gunElevAlt = parseFloat(gunElevStr);
       const centerY = mapOriginY + (mapSize * 1000) / 2;
 
       let nextMode: 'OFF' | '2X' | '4X' | '8X' = 'OFF';
-      let nextSize = 10;
       
       if (zoomMode === 'OFF' || zoomMode === 'FIT') {
-          nextMode = '2X'; nextSize = 4;
+          nextMode = '2X';
       } else if (zoomMode === '2X') {
-          nextMode = '4X'; nextSize = 2;
+          nextMode = '4X';
       } else if (zoomMode === '4X') {
-          nextMode = '8X'; nextSize = 1;
+          nextMode = '8X';
       } else {
-          nextMode = 'OFF'; nextSize = 10;
+          nextMode = 'OFF';
       }
 
       setZoomMode(nextMode);
-      setMapSize(nextSize);
       
       if (nextMode === 'OFF') {
           setMapOriginX(0);
           setMapOriginY(0);
       } else {
+          const nextSize = nextMode === '2X' ? baseMapSize / 2 : 
+                           nextMode === '4X' ? baseMapSize / 4 : 
+                           nextMode === '8X' ? baseMapSize / 8 : 
+                           baseMapSize;
           setMapOriginX(Math.max(0, centerX - (nextSize * 1000) / 2));
           setMapOriginY(Math.max(0, Math.max(0, centerY - (nextSize * 1000) / 2))); // ensure > 0
       }
@@ -1494,6 +1613,18 @@ const gunElevAlt = parseFloat(gunElevStr);
       
   };
 
+  const handleCancelFire = () => {
+      setFireStarts([]);
+      setFireDelayEnd(null);
+      if (connsRef.current.length > 0 && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
+          connsRef.current.forEach(conn => {
+              if (conn.open) {
+                  conn.send({ type: 'CANCEL_FIRE' });
+              }
+          });
+      }
+  };
+
   const handleFire = () => {
     if (calculation.valid && calculation.tof) {
       let t_x = parseGridPiece(tgtX);
@@ -1515,20 +1646,41 @@ const gunElevAlt = parseFloat(gunElevStr);
 
       setFireStarts(prev => [...prev, newFire]);
       setNow(Date.now());
+      setFireDelayEnd(null);
       
-      if (connRef.current && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
-          connRef.current.send({
-              type: 'FIRE',
-              payload: {
-                  tof: newFire.tof,
-                  tx: newFire.tx,
-                  ty: newFire.ty,
-                  disp: newFire.disp
+      if (connsRef.current.length > 0 && (peerStatus === 'CONNECTED' || peerStatus === 'HOSTING')) {
+          connsRef.current.forEach(conn => {
+              if (conn.open) {
+                  conn.send({
+                      type: 'FIRE',
+                      payload: {
+                          id: newFire.id,
+                          start: newFire.start,
+                          tof: newFire.tof,
+                          tx: newFire.tx,
+                          ty: newFire.ty,
+                          disp: newFire.disp
+                      }
+                  });
               }
           });
       }
     }
   };
+
+  useEffect(() => {
+      if (fireDelayEnd !== null) {
+          const checkDelay = () => {
+              if (Date.now() >= fireDelayEnd) {
+                  setFireDelayEnd(null);
+                  handleFire();
+              }
+          };
+          const interval = setInterval(checkDelay, 100);
+          return () => clearInterval(interval);
+      }
+  }, [fireDelayEnd, calculation.valid, tgtX, tgtY, adjN, adjS, adjE, adjW]);
+
 
   let timerRender = null;
   if (fireStarts.length > 0) {
@@ -1570,17 +1722,21 @@ const gunElevAlt = parseFloat(gunElevStr);
 
       <div className="mfd-main">
         <div className="mfd-sidebar left">
-            <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>MAP</button>
+            <button className={`osb-button ${activePage === 'MAP' ? 'active' : ''}`} onClick={() => setActivePage('MAP')}>FDC</button>
+            <button className={`osb-button ${activePage === 'SPOTTER' ? 'active' : ''}`} onClick={() => setActivePage('SPOTTER')}>SPOT</button>
+            <button className={`osb-button ${activePage === 'GUNNER' ? 'active' : ''}`} onClick={() => setActivePage('GUNNER')}>GUN</button>
+
+            <div style={{ flex: 1 }} />
+
             <button className={`osb-button ${showMapSizeControls ? 'active' : ''}`} onClick={() => setShowMapSizeControls(!showMapSizeControls)}>MAP<br/>SIZE</button>
             
             {showMapSizeControls && (
                 <>
-                    <button className="osb-button" onClick={() => setMapSize(prev => Math.min(99, prev + 1))}>+ 1 KM²</button>
-                    <button className="osb-button" onClick={() => setMapSize(prev => Math.max(1, prev - 1))}>- 1 KM²</button>
+                    <button className="osb-button" onClick={() => setBaseMapSize(prev => Math.min(99, prev + 1))}>+ 1 KM²</button>
+                    <button className="osb-button" onClick={() => setBaseMapSize(prev => Math.max(1, prev - 1))}>- 1 KM²</button>
                 </>
             )}
-
-            <div style={{ marginTop: '30px' }} />
+            
             <button 
                 className={`osb-button ${activeField === 'linkCode' ? 'term-cursor-animate active' : ''}`} 
                 onClick={() => { setActiveField('linkCode'); setJustFocusedField('linkCode'); }}
@@ -1590,13 +1746,12 @@ const gunElevAlt = parseFloat(gunElevStr);
                 <br />
                 {linkCode.padEnd(4, '—')}
             </button>
-            <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '4px', letterSpacing: '1px', opacity: peerStatus === 'OFFLINE' ? 0.5 : 1, color: 'var(--term-fg)' }}>
-                {peerStatus}
+            <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '4px', marginBottom: '16px', letterSpacing: '1px', opacity: peerStatus === 'OFFLINE' ? 0.5 : 1, color: 'var(--term-fg)' }}>
+                {peerStatus === 'WAITING' ? <span>LINKING<span className="loading-dots"></span></span> : peerStatus}
+                {connCount > 0 && <div>NET: {connCount + 1}</div>}
             </div>
 
-            <div style={{ flex: 1 }} />
             <button className={`osb-button ${activePage === 'SETTINGS' ? 'active' : ''}`} onClick={() => setActivePage('SETTINGS')}>SYS<br/>CFG</button>
-            <button className={`osb-button ${activePage === 'SPOTTER' ? 'active' : ''}`} onClick={() => setActivePage('SPOTTER')}>SPT<br/>TGT</button>
         </div>
 
         <div className="mfd-screen">
@@ -1608,7 +1763,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                 <input 
                     type="number" 
                     value={mapSize} 
-                    onChange={(e) => setMapSize(Math.max(1, parseInt(e.target.value) || 1))}
+                    onChange={(e) => setBaseMapSize(Math.max(1, parseInt(e.target.value) || 1))}
                     style={{ backgroundColor: 'transparent', border: '1px solid var(--term-border)', color: 'var(--term-fg)', fontFamily: 'inherit', padding: '6px', width: '80px', outline: 'none', fontSize: '16px' }}
                 />
             </div>
@@ -1740,64 +1895,110 @@ const gunElevAlt = parseFloat(gunElevStr);
 
 
 
-      
-      {activePage === 'SPOTTER' && (
-          <div className="terminal-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-              <div className="terminal-header" style={{ marginBottom: '10px' }}>SPOTTER TARGETS</div>
-              <div className="input-section" style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
-                  {[1,2,3,4,5,6,7,8,9].map(i => {
-                      const t = spotterTargets[i] || {x:'', y:'', alt:''};
-                      return (
-                          <div key={i} style={{ marginBottom: '15px' }}>
-                              <div style={{ color: 'var(--term-fg)', marginBottom: '4px', borderBottom: '1px solid var(--term-border)' }}>TARGET {i}</div>
-                              <div className="input-row">
-                                  <span>X:</span>
-                                  <input 
-                                      type="text" 
-                                      className={`terminal-input ${activeField === `spot${i}X` ? 'active' : ''}`}
-                                      value={t.x}
-                                      onChange={(e) => {
-                                          let v = e.target.value.replace(/[^0-9]/g, '');
-                                          if (v.length > 4) v = v.substring(0, 4);
-                                          setSpotterTargets(p => ({...p, [i]: {...(p[i]||{x:'',y:'',alt:''}), x: v}}));
-                                      }}
-                                      onFocus={() => { setJustFocusedField(`spot${i}X`); setActiveField(`spot${i}X`); }}
-                                      onBlur={() => { if (activeField === `spot${i}X`) setActiveField('linkCode'); }}
-                                  />
-                              </div>
-                              <div className="input-row">
-                                  <span>Y:</span>
-                                  <input 
-                                      type="text" 
-                                      className={`terminal-input ${activeField === `spot${i}Y` ? 'active' : ''}`}
-                                      value={t.y}
-                                      onChange={(e) => {
-                                          let v = e.target.value.replace(/[^0-9]/g, '');
-                                          if (v.length > 4) v = v.substring(0, 4);
-                                          setSpotterTargets(p => ({...p, [i]: {...(p[i]||{x:'',y:'',alt:''}), y: v}}));
-                                      }}
-                                      onFocus={() => { setJustFocusedField(`spot${i}Y`); setActiveField(`spot${i}Y`); }}
-                                      onBlur={() => { if (activeField === `spot${i}Y`) setActiveField('linkCode'); }}
-                                  />
-                              </div>
-                              <div className="input-row">
-                                  <span>ALT:</span>
-                                  <input 
-                                      type="text" 
-                                      className={`terminal-input ${activeField === `spot${i}Alt` ? 'active' : ''}`}
-                                      value={t.alt}
-                                      onChange={(e) => {
-                                          let v = e.target.value.replace(/[^0-9-]/g, '');
-                                          setSpotterTargets(p => ({...p, [i]: {...(p[i]||{x:'',y:'',alt:''}), alt: v}}));
-                                      }}
-                                      onFocus={() => { setJustFocusedField(`spot${i}Alt`); setActiveField(`spot${i}Alt`); }}
-                                      onBlur={() => { if (activeField === `spot${i}Alt`) setActiveField('linkCode'); }}
-                                  />
+
+      {activePage === 'GUNNER' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px', gap: '20px', overflowY: 'auto' }}>
+              <div style={{ borderBottom: '1px dashed var(--term-border)', paddingBottom: '8px', fontSize: '14px', letterSpacing: '0.1em', textAlign: 'center' }}>
+                  GUNNER DISPLAY
+              </div>
+              
+              {!calculation.valid ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '20px' }}>
+                      <div style={{ fontSize: '24px', animation: 'blinker 1s linear infinite' }}>WAITING FOR DATA</div>
+                      <div style={{ fontSize: '14px', opacity: 0.7 }}>{calculation.message || 'NO SOLUTION'}</div>
+                  </div>
+              ) : (
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: '40px' }}>
+                      {/* Periscope Visual */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '120px 250px', gridTemplateRows: '250px 120px', gap: '20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: '48px', fontWeight: 'bold' }}>
+                              <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '16px', opacity: 0.7, marginBottom: '8px' }}>ELEV (Y)</div>
+                                  <div>{elMilStr}</div>
                               </div>
                           </div>
-                      );
-                  })}
-              </div>
+                          <div style={{ position: 'relative', width: '250px', height: '250px', border: '4px solid var(--term-fg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ position: 'absolute', width: '100%', height: '2px', background: 'var(--term-fg)', opacity: 0.4 }} />
+                              <div style={{ position: 'absolute', width: '2px', height: '100%', background: 'var(--term-fg)', opacity: 0.4 }} />
+                              <div style={{ width: '40px', height: '40px', border: '2px solid var(--term-fg)', borderRadius: '50%', opacity: 0.8 }} />
+                          </div>
+                          <div />
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontSize: '48px', fontWeight: 'bold' }}>
+                              <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontSize: '16px', opacity: 0.7, marginBottom: '8px' }}>DEFL (X)</div>
+                                  <div>{azMilStr}</div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Loadout Visual */}
+                      <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-end' }}>
+                          {/* Shell */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                              <svg viewBox="0 0 64 184" width="78" height="224" stroke="currentColor" fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" style={{ overflow: 'visible' }}>
+                                  {/* Shell Outline */}
+                                  <path d="M 29 4 L 35 4 L 38 20 Q 49 42 52 92 L 52 152 L 52 157 L 47 182 L 17 182 L 12 157 L 12 152 L 12 92 Q 15 42 26 20 L 29 4 Z" />
+                                  {/* Driving Band Lines */}
+                                  <line x1="12" y1="152" x2="52" y2="152" />
+                                  <line x1="12" y1="157" x2="52" y2="157" />
+                                  {/* Fuze Base Line */}
+                                  <line x1="26" y1="20" x2="38" y2="20" />
+                                  {/* Fuze Detent */}
+                                  <circle cx="32" cy="14" r="1.5" stroke="none" fill="currentColor" />
+                                  {/* Weight Zone Squares */}
+                                  <rect x="23" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                  <rect x="30" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                  <rect x="37" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                  {/* Lettering */}
+                                  <text x="32" y="115" textAnchor="middle" fill="currentColor" stroke="none" fontSize="14" fontWeight="bold" letterSpacing="1">TNT</text>
+                                  <text x="32" y="135" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontWeight="bold">155 MM</text>
+                              </svg>
+                              <div style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center' }}>M107<br/>HE</div>
+                          </div>
+
+                          {/* Charges */}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '6px' }}>
+                                  {[1, 2, 3, 4, 5].map(c => {
+                                      const activeChg = parseInt(String(chargeStr)) || 0;
+                                      const isActive = activeChg >= c;
+                                      return (
+                                          <div key={c} style={{ width: '80px', height: '40px', border: '4px solid var(--term-fg)', background: isActive ? 'var(--term-fg)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? 'var(--term-bg)' : 'var(--term-fg)', fontWeight: 'bold', fontSize: '24px' }}>
+                                              {c}
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                              <div style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center' }}>CHG<br/>{chargeStr}</div>
+                          </div>
+                      </div>
+                      
+                      {/* TOF Bar */}
+                      {fireStarts.length > 0 && (
+                          <div style={{ width: '100%', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold' }}>
+                                  <span>TIME OF FLIGHT</span>
+                                  <span>
+                                      {Math.min(fireStarts[fireStarts.length - 1].tof, (now - fireStarts[fireStarts.length - 1].start) / 1000).toFixed(1)}s / {fireStarts[fireStarts.length - 1].tof.toFixed(1)}s
+                                  </span>
+                              </div>
+                              <div style={{ width: '100%', height: '24px', border: '2px solid var(--term-fg)', position: 'relative' }}>
+                                  <div style={{ 
+                                      height: '100%', 
+                                      background: 'var(--term-fg)', 
+                                      width: `${Math.min(100, ((now - fireStarts[fireStarts.length - 1].start) / 1000) / fireStarts[fireStarts.length - 1].tof * 100)}%`,
+                                      transition: 'width 0.1s linear'
+                                  }} />
+                                  {((now - fireStarts[fireStarts.length - 1].start) / 1000) >= fireStarts[fireStarts.length - 1].tof && (
+                                      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--term-bg)', fontWeight: 'bold', animation: 'blinker 0.2s linear infinite' }}>
+                                          SPLASH
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
           </div>
       )}
 
@@ -1830,7 +2031,7 @@ const gunElevAlt = parseFloat(gunElevStr);
           </div>
       )}
 
-      {activePage === 'MAP' && (
+      {(activePage === 'MAP' || activePage === 'SPOTTER') && (
           <div className="map-page map-responsive-wrapper">
              <div className="map-canvas-container" style={{ position: 'relative' }}>
                  <canvas 
@@ -1883,9 +2084,9 @@ const gunElevAlt = parseFloat(gunElevStr);
                              <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 40px)', gridTemplateRows: 'repeat(4, 40px)', gap: '4px' }}>
                                  <button className="dpad-btn" style={{fontSize: '12px', borderStyle: 'solid'}} onClick={() => { if (dpadMode === 'TGT') setDpadMode('GUN'); else if (dpadMode === 'GUN') setDpadMode('ADJUST'); else if (dpadMode === 'ADJUST') setDpadMode('PAN'); else setDpadMode('TGT'); }}>MOD</button>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'N'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'N'); else if (dpadMode === 'ADJUST') handleAdjust('N'); else if (dpadMode === 'PAN') handlePan('N'); }}>▲</RepeatButton>
-                                 <div />
+                                 <button className={`dpad-btn ${dpadTgtMode ? 'active' : ''}`} style={{fontSize: '14px', borderStyle: dpadTgtMode ? 'solid' : 'dashed'}} onClick={() => setDpadTgtMode(!dpadTgtMode)}>TGT</button>
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'W'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'W'); else if (dpadMode === 'ADJUST') handleAdjust('W'); else if (dpadMode === 'PAN') handlePan('W'); }}>◀</RepeatButton>
-                                 {dpadMode === 'ADJUST' ? <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0, fontSize: '18px' }}>⨯</button> : <button className={`dpad-btn ${dpadTgtMode ? 'active' : ''}`} style={{fontSize: '14px', borderStyle: dpadTgtMode ? 'solid' : 'dashed'}} onClick={() => setDpadTgtMode(!dpadTgtMode)}>TGT</button>}
+                                 {dpadMode === 'ADJUST' ? <button onClick={handleResetAdjust} className="dpad-btn dpad-btn-reset" style={{ marginTop: 0, fontSize: '18px' }}>⨯</button> : <div />}
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'E'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'E'); else if (dpadMode === 'ADJUST') handleAdjust('E'); else if (dpadMode === 'PAN') handlePan('E'); }}>▶</RepeatButton>
                                  <div />
                                  <RepeatButton className="dpad-btn" style={{fontSize: '18px'}} onClick={() => { if (dpadMode === 'GUN') handleGridAdjust('gun', 'S'); else if (dpadMode === 'TGT') handleGridAdjust('tgt', 'S'); else if (dpadMode === 'ADJUST') handleAdjust('S'); else if (dpadMode === 'PAN') handlePan('S'); }}>▼</RepeatButton>
@@ -1919,37 +2120,69 @@ const gunElevAlt = parseFloat(gunElevStr);
 
                      <div className="sidebar-right-group">
                      {/* TERMINAL INPUTS */}
-                         <div className="term-inputs-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
-                             <TerminalField id="gunX" label="GUN X" val={gunX} />
-                             <TerminalField id="gunY" label="GUN Y" val={gunY} />
-                             <TerminalField id="gunElev" label="GUN ALT" val={gunElevStr} />
-                             <div style={{ height: '4px' }} />
-                             <TerminalField id="tgtX" label="TGT X" val={tgtX} />
-                             <TerminalField id="tgtY" label="TGT Y" val={tgtY} />
-                             <TerminalField id="tgtElev" label="TGT ALT" val={tgtElevStr} />
-                             <div style={{ height: '4px' }} />
-                             <TerminalField id="windSpeed" label="WND SPD" val={windSpeed} />
-                             <TerminalField id="windDir" label="WND DIR" val={windDir} />
-                             <div style={{ height: '4px' }} />
-                             <TerminalField id="charge" label="CHARGE" val={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr} />
+                         <div className={`term-inputs-wrapper ${activePage === 'SPOTTER' ? 'spotter-scroll-container' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
+                             {activePage === 'MAP' && (
+                                 <>
+                                     <TerminalField id="gunX" label="GUN X" val={gunX} />
+                                     <TerminalField id="gunY" label="GUN Y" val={gunY} />
+                                     <TerminalField id="gunElev" label="GUN ALT" val={gunElevStr} />
+                                     <div style={{ height: '4px' }} />
+                                     <TerminalField id="tgtX" label="TGT X" val={tgtX} />
+                                     <TerminalField id="tgtY" label="TGT Y" val={tgtY} />
+                                     <TerminalField id="tgtElev" label="TGT ALT" val={tgtElevStr} />
+                                     <div style={{ height: '4px' }} />
+                                     <TerminalField id="windSpeed" label="WND SPD" val={windSpeed} />
+                                     <TerminalField id="windDir" label="WND DIR" val={windDir} />
+                                     <div style={{ height: '4px' }} />
+                                     <TerminalField id="charge" label="CHARGE" val={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr} />
+                                 </>
+                             )}
+                             {activePage === 'SPOTTER' && (
+                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                     <div style={{ width: '24px' }}></div>
+                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--term-fg)', fontWeight: 'bold' }}>
+                                         <div>X</div>
+                                         <div>Y</div>
+                                         <div>EL</div>
+                                     </div>
+                                 </div>
+                             )}
+                             {activePage === 'SPOTTER' && [1,2,3,4,5,6,7,8,9].map(i => {
+                                 const t = spotterTargets[i] || {x:'', y:'', alt:''};
+                                 const isCurrentlyTargeted = t.x !== '' && t.y !== '' && tgtX === t.x && tgtY === t.y;
+                                 return (
+                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: i < 9 ? '4px' : '0' }}>
+                                         <div style={{ width: '24px', color: 'var(--term-fg)', fontSize: '11px', textAlign: 'left', fontWeight: 'bold' }}>
+                                             <span style={{ display: 'inline-block', width: '10px' }}>{isCurrentlyTargeted ? '>' : '\u00A0'}</span>T{i}
+                                         </div>
+                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', flex: 1 }}>
+                                             <TerminalField id={`spot${i}X`} label="" val={t.x} hideLabel />
+                                             <TerminalField id={`spot${i}Y`} label="" val={t.y} hideLabel />
+                                             <TerminalField id={`spot${i}Alt`} label="" val={t.alt} hideLabel />
+                                         </div>
+                                     </div>
+                                 );
+                             })}
                          </div>
 
                      {/* BDT */}
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', flex: 1, justifyContent: 'flex-end' }}>
-                             <div style={{ minHeight: '22px' }}>
-                                 {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
-                                     <div style={{ color: 'var(--term-fg)', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
-                                 )}
+                         {activePage !== 'SPOTTER' && (
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '14px', lineHeight: '1.4', color: 'var(--term-fg)', flex: 1, justifyContent: 'flex-end' }}>
+                                 <div style={{ minHeight: '22px' }}>
+                                     {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                                         <div style={{ color: 'var(--term-fg)', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
+                                     )}
+                                 </div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>WND</span><span>{windSpeed && parseFloat(windSpeed) > 0 ? `${windSpeed}m/s @ ${windDir || '0'}` : '--'}</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
                              </div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>ADJ</span><span>{adjStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid var(--term-border)', marginTop: '4px', paddingTop: '4px' }}><span>WND</span><span>{windSpeed && parseFloat(windSpeed) > 0 ? `${windSpeed}m/s @ ${windDir || '0'}` : '--'}</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>TOF</span><span>{tofStr}s</span></div>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}><span>DISP</span><span>{calculation.valid && calculation.dispersion ? `~${calculation.dispersion}` : '--'} M</span></div>
-                         </div>
+                         )}
                      </div>
                  </div>
           </div>
@@ -2002,15 +2235,28 @@ const gunElevAlt = parseFloat(gunElevStr);
 
                     {/* Bottom Group */}
                     
-                    {calculation.valid && fireStarts.length > 0 && (
-                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={handleFire}>
+                    <button className="osb-button" onClick={() => setIsDelayOn(p => !p)} style={{ borderStyle: 'solid', background: isDelayOn ? 'var(--term-fg)' : 'transparent', color: isDelayOn ? 'var(--term-bg)' : 'var(--term-fg)' }}>
+                        F-DLY<br/>{isDelayOn ? 'ON' : 'OFF'}
+                    </button>
+                    {calculation.valid && fireStarts.length > 0 && !fireDelayEnd && (
+                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={() => {
+                            if (isDelayOn) { setFireDelayEnd(Date.now() + 5000); setNow(Date.now()); } else handleFire();
+                        }}>
                             + ROUND
                         </button>
                     )}
-                    {fireStarts.length > 0 ? (
+                    {fireDelayEnd ? (
+                        <button 
+                            className="osb-button" 
+                            onClick={(e) => { e.stopPropagation(); setFireDelayEnd(null); }}
+                            style={{ borderStyle: 'solid', animation: 'blinker 0.5s linear infinite', color: 'var(--term-bg)', background: 'var(--term-fg)' }}
+                        >
+                            FIRE<br/>{Math.ceil((fireDelayEnd - now) / 1000)}
+                        </button>
+                    ) : fireStarts.length > 0 ? (
                         <button 
                             className="osb-button btn-cancel-fire" 
-                            onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
+                            onClick={(e) => { e.stopPropagation(); handleCancelFire(); }}
                             style={{ borderStyle: 'solid' }}
                         >
                             <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
@@ -2018,7 +2264,9 @@ const gunElevAlt = parseFloat(gunElevStr);
                     ) : (
                         <button 
                             className="osb-button" 
-                            onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
+                            onClick={calculation.valid ? () => {
+                                if (isDelayOn) { setFireDelayEnd(Date.now() + 5000); setNow(Date.now()); } else handleFire();
+                            } : undefined} disabled={!calculation.valid}
                             style={{
                                 borderStyle: 'solid',
                                 cursor: calculation.valid ? 'pointer' : 'not-allowed',
@@ -2034,21 +2282,52 @@ const gunElevAlt = parseFloat(gunElevStr);
                 </>
             ) : (
                 <>
+                    {activePage === 'SPOTTER' && (
+                        <>
+                            <button
+                                className="osb-button"
+                                onClick={handleCycleZoom}
+                                style={{ borderStyle: 'solid' }}
+                            >
+                                ZOOM: {zoomMode}
+                            </button>
+                            <button
+                                className="osb-button"
+                                onClick={handleZoomFit}
+                            >
+                                FIT ZOOM
+                            </button>
+                            <div style={{ flex: 1 }} />
+                        </>
+                    )}
                     {(adjN || adjS || adjE || adjW) && (
                         <button className="osb-button" onClick={handleCommitAdj}>
                             COMMIT<br/>ADJ
                         </button>
                     )}
                     <div style={{ flex: 1 }} />
-                    {calculation.valid && fireStarts.length > 0 && (
-                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={handleFire}>
+                    <button className="osb-button" onClick={() => setIsDelayOn(p => !p)} style={{ borderStyle: 'solid', background: isDelayOn ? 'var(--term-fg)' : 'transparent', color: isDelayOn ? 'var(--term-bg)' : 'var(--term-fg)' }}>
+                        F-DLY<br/>{isDelayOn ? 'ON' : 'OFF'}
+                    </button>
+                    {calculation.valid && fireStarts.length > 0 && !fireDelayEnd && (
+                        <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={() => {
+                            if (isDelayOn) { setFireDelayEnd(Date.now() + 5000); setNow(Date.now()); } else handleFire();
+                        }}>
                             + ROUND
                         </button>
                     )}
-                    {fireStarts.length > 0 ? (
+                    {fireDelayEnd ? (
+                        <button 
+                            className="osb-button" 
+                            onClick={(e) => { e.stopPropagation(); setFireDelayEnd(null); }}
+                            style={{ borderStyle: 'solid', animation: 'blinker 0.5s linear infinite', color: 'var(--term-bg)', background: 'var(--term-fg)' }}
+                        >
+                            FIRE<br/>{Math.ceil((fireDelayEnd - now) / 1000)}
+                        </button>
+                    ) : fireStarts.length > 0 ? (
                         <button 
                             className="osb-button btn-cancel-fire" 
-                            onClick={(e) => { e.stopPropagation(); setFireStarts([]); }}
+                            onClick={(e) => { e.stopPropagation(); handleCancelFire(); }}
                             style={{ borderStyle: 'solid' }}
                         >
                             <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
@@ -2056,7 +2335,9 @@ const gunElevAlt = parseFloat(gunElevStr);
                     ) : (
                         <button 
                             className="osb-button" 
-                            onClick={calculation.valid ? handleFire : undefined} disabled={!calculation.valid}
+                            onClick={calculation.valid ? () => {
+                                if (isDelayOn) { setFireDelayEnd(Date.now() + 5000); setNow(Date.now()); } else handleFire();
+                            } : undefined} disabled={!calculation.valid}
                             style={{
                                 borderStyle: 'solid',
                                 cursor: calculation.valid ? 'pointer' : 'not-allowed',

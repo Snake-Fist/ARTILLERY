@@ -472,6 +472,19 @@ button:active {
   animation: term-cursor-anim 1s step-end infinite;
 }
 
+.spotter-scroll-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  gap: 4px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.spotter-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
 /* Cancel Fire Button overlays */
 .btn-cancel-fire {
   background: linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%), linear-gradient(to top right, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%);
@@ -482,4 +495,17 @@ button:active {
     background: var(--term-fg);
     color: var(--term-bg);
   }
+}
+
+@keyframes term-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+.loading-dots::after {
+  content: '';
+  animation: term-dots 1.5s infinite step-end;
 }
