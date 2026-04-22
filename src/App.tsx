@@ -8,142 +8,174 @@ import keyOut2Snd from './assets/key-out-2.wav';
 import keyIn3Snd from './assets/key-in-3.wav';
 import keyOut3Snd from './assets/key-out-3.wav';
 
-// M107 HE Ballistic Data for Charges 1-5
-const CHARGES = [
-  {
-    id: 1,
-    min: 950,
-    max: 1500,
-    dispersion: 69,
-    data: [
-        { range: 950, elev: 1245, tof: 24.4 },
-        { range: 1000, elev: 1221, tof: 24.2 },
-        { range: 1050, elev: 1197, tof: 24.0 },
-        { range: 1100, elev: 1171, tof: 23.7 },
-        { range: 1150, elev: 1144, tof: 23.4 },
-        { range: 1200, elev: 1115, tof: 23.1 },
-        { range: 1250, elev: 1084, tof: 22.7 },
-        { range: 1300, elev: 1050, tof: 22.3 },
-        { range: 1350, elev: 1011, tof: 21.8 },
-        { range: 1400, elev: 965, tof: 21.2 },
-        { range: 1450, elev: 907, tof: 20.3 },
-        { range: 1500, elev: 800, tof: 18.6 }
-    ]
-  },
-  {
-    id: 2,
-    min: 1500,
-    max: 2500,
-    dispersion: 69,
-    data: [
-        { range: 1500, elev: 1270, tof: 33.1 },
-        { range: 1550, elev: 1257, tof: 33.0 },
-        { range: 1600, elev: 1243, tof: 32.9 },
-        { range: 1650, elev: 1229, tof: 32.7 },
-        { range: 1700, elev: 1214, tof: 32.5 },
-        { range: 1750, elev: 1200, tof: 32.4 },
-        { range: 1800, elev: 1185, tof: 32.1 },
-        { range: 1850, elev: 1169, tof: 31.9 },
-        { range: 1900, elev: 1153, tof: 31.7 },
-        { range: 1950, elev: 1136, tof: 31.5 },
-        { range: 2000, elev: 1119, tof: 31.2 },
-        { range: 2050, elev: 1101, tof: 31.0 },
-        { range: 2100, elev: 1082, tof: 30.7 },
-        { range: 2150, elev: 1062, tof: 30.3 },
-        { range: 2200, elev: 1041, tof: 30.0 },
-        { range: 2250, elev: 1018, tof: 29.6 },
-        { range: 2300, elev: 995, tof: 29.2 },
-        { range: 2350, elev: 967, tof: 28.7 },
-        { range: 2400, elev: 938, tof: 28.1 },
-        { range: 2450, elev: 904, tof: 27.5 },
-        { range: 2500, elev: 860, tof: 26.5 }
-    ]
-  },
-  {
-    id: 3,
-    min: 2100,
-    max: 3600,
-    dispersion: 69,
-    data: [
-        { range: 2100, elev: 1272, tof: 41.0 },
-        { range: 2200, elev: 1253, tof: 40.8 },
-        { range: 2300, elev: 1233, tof: 40.5 },
-        { range: 2400, elev: 1213, tof: 40.2 },
-        { range: 2500, elev: 1192, tof: 39.9 },
-        { range: 2600, elev: 1170, tof: 39.5 },
-        { range: 2700, elev: 1147, tof: 39.1 },
-        { range: 2800, elev: 1123, tof: 38.7 },
-        { range: 2900, elev: 1098, tof: 38.3 },
-        { range: 3000, elev: 1070, tof: 37.7 },
-        { range: 3100, elev: 1042, tof: 37.2 },
-        { range: 3200, elev: 1010, tof: 36.5 },
-        { range: 3300, elev: 975, tof: 35.7 },
-        { range: 3400, elev: 936, tof: 34.9 },
-        { range: 3500, elev: 890, tof: 33.7 },
-        { range: 3600, elev: 828, tof: 32.1 }
-    ]
-  },
-  {
-    id: 4,
-    min: 2600,
-    max: 4500,
-    dispersion: 69,
-    data: [
-        { range: 2600, elev: 1271, tof: 47.2 },
-        { range: 2700, elev: 1255, tof: 47.0 },
-        { range: 2800, elev: 1240, tof: 46.7 },
-        { range: 2900, elev: 1224, tof: 46.5 },
-        { range: 3000, elev: 1207, tof: 46.2 },
-        { range: 3100, elev: 1190, tof: 45.9 },
-        { range: 3200, elev: 1172, tof: 45.6 },
-        { range: 3300, elev: 1154, tof: 45.2 },
-        { range: 3400, elev: 1135, tof: 44.9 },
-        { range: 3500, elev: 1116, tof: 44.5 },
-        { range: 3600, elev: 1095, tof: 44.0 },
-        { range: 3700, elev: 1074, tof: 43.6 },
-        { range: 3800, elev: 1052, tof: 43.1 },
-        { range: 3900, elev: 1028, tof: 42.5 },
-        { range: 4000, elev: 1003, tof: 41.9 },
-        { range: 4100, elev: 976, tof: 41.3 },
-        { range: 4200, elev: 946, tof: 40.5 },
-        { range: 4300, elev: 912, tof: 39.6 },
-        { range: 4400, elev: 874, tof: 38.5 },
-        { range: 4500, elev: 828, tof: 37.2 }
-    ]
-  },
-  {
-    id: 5,
-    min: 3000,
-    max: 5300,
-    dispersion: 69,
-    data: [
-        { range: 3000, elev: 1271, tof: 52.2 },
-        { range: 3100, elev: 1258, tof: 52.0 },
-        { range: 3200, elev: 1244, tof: 51.8 },
-        { range: 3300, elev: 1230, tof: 51.5 },
-        { range: 3400, elev: 1216, tof: 51.3 },
-        { range: 3500, elev: 1202, tof: 51.0 },
-        { range: 3600, elev: 1187, tof: 50.7 },
-        { range: 3700, elev: 1172, tof: 50.4 },
-        { range: 3800, elev: 1156, tof: 50.1 },
-        { range: 3900, elev: 1140, tof: 49.8 },
-        { range: 4000, elev: 1124, tof: 49.4 },
-        { range: 4100, elev: 1107, tof: 49.0 },
-        { range: 4200, elev: 1089, tof: 48.6 },
-        { range: 4300, elev: 1071, tof: 48.2 },
-        { range: 4400, elev: 1052, tof: 47.7 },
-        { range: 4500, elev: 1032, tof: 47.2 },
-        { range: 4600, elev: 1011, tof: 46.7 },
-        { range: 4700, elev: 989, tof: 46.1 },
-        { range: 4800, elev: 966, tof: 45.5 },
-        { range: 4900, elev: 941, tof: 44.7 },
-        { range: 5000, elev: 913, tof: 44.0 },
-        { range: 5100, elev: 883, tof: 43.1 },
-        { range: 5200, elev: 850, tof: 42.0 },
-        { range: 5300, elev: 809, tof: 40.7 }
-    ]
-  }
+const BASE_VELOCITY = 100;
+const AIR_FRICTION = 0.000226;
+const GRAVITY = 9.80665;
+
+const CHARGE_DEFS = [
+    { id: 1, coef: 1.400, min: 950, max: 1500, dispersion: 69 },
+    { id: 2, coef: 2.045, min: 1500, max: 2500, dispersion: 69 },
+    { id: 3, coef: 2.790, min: 2100, max: 3600, dispersion: 69 },
+    { id: 4, coef: 3.535, min: 2600, max: 4500, dispersion: 69 },
+    { id: 5, coef: 4.280, min: 3000, max: 5300, dispersion: 69 }
 ];
+
+function simulateTrajectory(V0: number, elevMils: number) {
+    const angleRad = (elevMils * 360 / 6400) * (Math.PI / 180);
+    let vx = V0 * Math.cos(angleRad);
+    let vy = V0 * Math.sin(angleRad);
+    let x = 0, y = 0, t = 0;
+    const dt = 0.02;
+    
+    while (y >= 0 || t === 0) {
+        const v = Math.sqrt(vx*vx + vy*vy);
+        const ax = -AIR_FRICTION * v * vx;
+        const ay = -GRAVITY - AIR_FRICTION * v * vy;
+        vx += ax * dt;
+        vy += ay * dt;
+        x += vx * dt;
+        y += vy * dt;
+        t += dt;
+        if (t > 120) break;
+    }
+    return { range: x, tof: t };
+}
+
+
+function simulate3D(V0: number, elevMils: number, azMils: number, wSpd: number, wDir: number, targetZ: number) {
+    const elevRad = (elevMils * 360 / 6400) * (Math.PI / 180);
+    const azRad = (azMils * 360 / 6400) * (Math.PI / 180);
+    const windRad = wDir * (Math.PI / 180);
+    
+    // Arma applies a surface/altitude dampening to the weather UI wind speed.
+    // Derived experimentally: effective wind is roughly 81% of the UI value.
+    const coefWind = 0.81;
+    const wx = -wSpd * Math.sin(windRad) * coefWind;
+    const wy = -wSpd * Math.cos(windRad) * coefWind;
+    
+    let vx = V0 * Math.cos(elevRad) * Math.sin(azRad);
+    let vy = V0 * Math.cos(elevRad) * Math.cos(azRad);
+    let vz = V0 * Math.sin(elevRad);
+    
+    let x = 0, y = 0, z = 0, t = 0;
+    const dt = 0.02;
+    
+    while (z >= targetZ || vz > 0) {
+        const relVx = vx - wx;
+        const relVy = vy - wy;
+        const relVz = vz;
+        const relV = Math.sqrt(relVx*relVx + relVy*relVy + relVz*relVz);
+        
+        const ax = -AIR_FRICTION * relV * relVx;
+        const ay = -AIR_FRICTION * relV * relVy;
+        const az = -GRAVITY - AIR_FRICTION * relV * relVz;
+        
+        vx += ax * dt;
+        vy += ay * dt;
+        vz += az * dt;
+        
+        x += vx * dt;
+        y += vy * dt;
+        
+        const nextZ = z + vz * dt;
+        if (nextZ < targetZ && vz < 0) {
+            const fraction = (targetZ - z) / (nextZ - z);
+            x = x - vx * dt + vx * (dt * fraction);
+            y = y - vy * dt + vy * (dt * fraction);
+            t = t + dt * fraction;
+            break;
+        }
+        
+        z = nextZ;
+        t += dt;
+        if (t > 150) break;
+    }
+    return { x, y, tof: t };
+}
+
+function solveFiringSolution(V0: number, targetDX: number, targetDY: number, targetZ: number, wSpd: number, wDir: number) {
+    const trueRange = Math.sqrt(targetDX*targetDX + targetDY*targetDY);
+    const trueAzRad = Math.atan2(targetDX, targetDY);
+    let trueAzMils = trueAzRad * 6400 / (2 * Math.PI);
+    if (trueAzMils < 0) trueAzMils += 6400;
+
+    let bestEl = 1000;
+    let bestAz = trueAzMils;
+    let bestTof = 0;
+    
+    for (let i = 0; i < 15; i++) {
+        let lowEl = 750;
+        let highEl = 1400;
+        for (let j = 0; j < 12; j++) {
+            const midEl = (lowEl + highEl) / 2;
+            const res = simulate3D(V0, midEl, bestAz, wSpd, wDir, targetZ);
+            const landRange = Math.sqrt(res.x*res.x + res.y*res.y);
+            if (landRange > trueRange) {
+                lowEl = midEl;
+            } else {
+                highEl = midEl;
+            }
+        }
+        bestEl = (lowEl + highEl) / 2;
+        
+        let lowAz = bestAz - 400;
+        let highAz = bestAz + 400;
+        for (let j = 0; j < 12; j++) {
+            const midAz = (lowAz + highAz) / 2;
+            const res = simulate3D(V0, bestEl, midAz, wSpd, wDir, targetZ);
+            const cross = targetDX * res.y - targetDY * res.x;
+            if (cross < 0) {
+                highAz = midAz;
+            } else {
+                lowAz = midAz;
+            }
+            bestTof = res.tof;
+        }
+        bestAz = (lowAz + highAz) / 2;
+    }
+    
+    let fix = bestAz - trueAzMils;
+    if (fix > 3200) fix -= 6400;
+    if (fix < -3200) fix += 6400;
+    
+    return { elev: Math.round(bestEl), azFix: Math.round(fix), tof: Number(bestTof.toFixed(1)) };
+}
+
+// Generate the high-resolution ballistics lookup table on load
+const CHARGES = CHARGE_DEFS.map(charge => {
+    const V0 = charge.coef * BASE_VELOCITY;
+    const data = [];
+    
+    for (let r = charge.min; r <= charge.max; r += 50) {
+        let lowElev = 750; // min High angle
+        let highElev = 1400; // max High angle
+        let bestElev = 1000;
+        let bestTof = 0;
+        
+        for (let iter = 0; iter < 16; iter++) {
+            const mid = (lowElev + highElev) / 2;
+            const res = simulateTrajectory(V0, mid);
+            if (res.range > r) {
+                lowElev = mid;
+            } else {
+                highElev = mid;
+            }
+            bestElev = mid;
+            bestTof = res.tof;
+        }
+        
+        data.push({ range: r, elev: Math.round(bestElev), tof: Number(bestTof.toFixed(1)) });
+    }
+    
+    return {
+        id: charge.id,
+        coef: charge.coef,
+        min: charge.min,
+        max: charge.max,
+        dispersion: charge.dispersion,
+        data: data
+    };
+});
 
 function parseGridPiece(p: string) {
   if (!p || p.trim() === '') return null;
@@ -183,10 +215,7 @@ function calculateAzimuthAndRange(gx: string, gy: string, tx: string, ty: string
   return { range: Math.round(dist), azimuth: azMil };
 }
 
-function interpolate(x: number, x0: number, x1: number, y0: number, y1: number) {
-  if (x0 === x1) return y0;
-  return y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
-}
+
 
 const RepeatButton = ({ onClick, children, style, className }: any) => {
   const timeoutRef = useRef<any>(null);
@@ -838,112 +867,34 @@ function App() {
     if (!activeCharge && r > CHARGES[CHARGES.length - 1].max) return { valid: false, message: `OUT OF RANGE (MAX ${CHARGES[CHARGES.length - 1].max}M)` };
     if (!activeCharge) return { valid: false, message: 'NO CHARGE AVAILABLE FOR RANGE' };
 
-    let baseTofInfo = 0;
-    let lowerIndexBase = 0;
-    for (let i = 0; i < activeCharge.data.length; i++) {
-        if (activeCharge.data[i].range <= r) lowerIndexBase = i;
-    }
-    if (activeCharge.data[lowerIndexBase].range === r) {
-        baseTofInfo = activeCharge.data[lowerIndexBase].tof;
-    } else {
-        const upperIndex = lowerIndexBase + 1 < activeCharge.data.length ? lowerIndexBase + 1 : lowerIndexBase;
-        if (lowerIndexBase === upperIndex) {
-            baseTofInfo = activeCharge.data[lowerIndexBase].tof;
-        } else {
-            baseTofInfo = interpolate(r, activeCharge.data[lowerIndexBase].range, activeCharge.data[upperIndex].range, activeCharge.data[lowerIndexBase].tof, activeCharge.data[upperIndex].tof);
-        }
-    }
-
-    let effectiveRange = r;
-    let azFix = 0;
-    
-    // Field tests demonstrate drag is linear in the engine.
-    // Using an empirically verified constant drag coefficient for this projectile:
-    let crosswindK = 0.46;
-    let tailwindK = 0.46;
-    let wSpeed = parseFloat(windSpeed);
-    let wDir = parseFloat(windDir);
-    if (!isNaN(wSpeed) && !isNaN(wDir) && gridData) {
-        const azRad = (gridData.azimuth / 6400) * 2 * Math.PI;
-        const wDirRad = (wDir / 360) * 2 * Math.PI;
-        const relAngleRad = wDirRad - azRad;
-        
-        // Kestrel reads Wind FROM. To align physics, we invert the velocity matrix.
-        const tailwind = -wSpeed * Math.cos(relAngleRad);
-        const crosswind = -wSpeed * Math.sin(relAngleRad);
-        
-        const windRangeShift = tailwind * baseTofInfo * tailwindK;
-        effectiveRange = Math.max(0, r - windRangeShift);
-        
-        // If wind drag pushed effective range out of current charge bounds, dynamically upgrade/downgrade!
-        if (forcedCharge === null && (effectiveRange < activeCharge.min || effectiveRange > activeCharge.max)) {
-            let newCharge = CHARGES.find(c => effectiveRange >= c.min && effectiveRange <= c.max);
-            if (newCharge) activeCharge = newCharge;
-        }
-        
-        const crossOffset = crosswind * baseTofInfo * crosswindK;
-        const angularDeflectionRad = Math.atan2(crossOffset, r);
-        azFix = -angularDeflectionRad * (6400 / (2 * Math.PI));
-    }
-
-    let lowerIndex = 0;
-    for (let i = 0; i < activeCharge.data.length; i++) {
-        if (activeCharge.data[i].range <= effectiveRange) {
-            lowerIndex = i;
-        }
-    }
-
-    let baseElev = 0;
-    let tof = 0;
-
-    if (activeCharge.data[lowerIndex].range === effectiveRange) {
-        baseElev = activeCharge.data[lowerIndex].elev;
-        tof = activeCharge.data[lowerIndex].tof;
-    } else {
-        const upperIndex = lowerIndex + 1 < activeCharge.data.length ? lowerIndex + 1 : lowerIndex;
-        const lower = activeCharge.data[lowerIndex];
-        const upper = activeCharge.data[upperIndex];
-        
-        if (lowerIndex === upperIndex) {
-            baseElev = lower.elev;
-            tof = lower.tof;
-        } else {
-            baseElev = interpolate(effectiveRange, lower.range, upper.range, lower.elev, upper.elev);
-            tof = interpolate(effectiveRange, lower.range, upper.range, lower.tof, upper.tof);
-        }
-    }
-
-    const gunElevAlt = parseFloat(gunElevStr);
+const gunElevAlt = parseFloat(gunElevStr);
     const tgtElevAlt = parseFloat(tgtElevStr);
     let deltaH = 0;
     if (!isNaN(gunElevAlt) && !isNaN(tgtElevAlt)) {
         deltaH = tgtElevAlt - gunElevAlt;
     }
 
-    let angleFix = 0;
-    let tofFix = 0;
+    let wSpeed = parseFloat(windSpeed);
+    if (isNaN(wSpeed)) wSpeed = 0;
+    let wDir = parseFloat(windDir);
+    if (isNaN(wDir)) wDir = 0;
 
-    if (deltaH !== 0 && r > 0) {
-        // Correct geometric elevation correction:
-        // The vertical angle to the target (in mils) must be added to the flat-earth table elevation.
-        // This is: atan(deltaH / range) converted from radians to NATO mils (6400 / 2π).
-        const vertAngleRad = Math.atan2(deltaH, r);
-        const vertAngleMils = vertAngleRad * (6400 / (2 * Math.PI));
-        angleFix = vertAngleMils; // positive = target higher = need more elevation
-
-        // TOF correction: tgt altitude changes effective range slightly.
-        // Approximate via slope of the charge table at current range.
-        let idx = lowerIndex;
-        if (idx >= activeCharge.data.length - 1) idx = activeCharge.data.length - 2;
-        const dRange = activeCharge.data[idx + 1].range - activeCharge.data[idx].range;
-        const dTof_dRange = (activeCharge.data[idx + 1].tof - activeCharge.data[idx].tof) / dRange;
-        // Slant range correction: actual slant = sqrt(r² + deltaH²), not r
-        const slantRange = Math.sqrt(r * r + deltaH * deltaH);
-        tofFix = dTof_dRange * (slantRange - r);
+    let targetAzRad = 0;
+    if (gridData && gridData.azimuth !== undefined) {
+        targetAzRad = (gridData.azimuth / 6400) * 2 * Math.PI;
     }
 
-    const finalElev = Math.round(baseElev + angleFix);
-    const finalTof = Math.round((tof + tofFix) * 10) / 10;
+    const tDX = r * Math.sin(targetAzRad);
+    const tDY = r * Math.cos(targetAzRad);
+
+    const activeV0 = activeCharge.coef * BASE_VELOCITY;
+
+    // Spin up LIVE 3D Physics Solver
+    const sol = solveFiringSolution(activeV0, tDX, tDY, deltaH, wSpeed, wDir);
+
+    const finalElev = sol.elev;
+    const finalTof = sol.tof;
+    const azFix = sol.azFix;
 
     if (finalElev < 0 || finalElev > 1300) {
         return { valid: false, message: 'SOLUTION IMPOSSIBLE (TRAVERSAL LIMIT)' };
