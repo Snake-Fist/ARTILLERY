@@ -359,6 +359,8 @@ function App() {
   const [mapOriginY, setMapOriginY] = useState<number>(0);
   const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
 
+  const [showMobileControls, setShowMobileControls] = useState<boolean>(true);
+
   const [theme, setTheme] = useState<'AMBER' | 'GREEN' | 'RED' | 'WHITE'>('AMBER');
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
 
@@ -938,11 +940,11 @@ function App() {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (fireStarts.length > 0) {
+    if (fireStarts.length > 0 || fireDelayEnd !== null) {
       interval = setInterval(() => setNow(Date.now()), 100);
     }
     return () => clearInterval(interval);
-  }, [fireStarts.length]);
+  }, [fireStarts.length, fireDelayEnd]);
 
   const gridData = useMemo(() => calculateAzimuthAndRange(gunX, gunY, tgtX, tgtY, '0', '0', '0', '0'), [gunX, gunY, tgtX, tgtY]);
 
@@ -2043,9 +2045,13 @@ const gunElevAlt = parseFloat(gunElevStr);
                      onMouseLeave={() => setCursorPos(null)}
                      style={{ 
                          border: '1px solid var(--term-border)',
-                         width: '100%',
-                         height: '100%',
+                         width: 'auto',
+                         height: 'auto',
+                         maxWidth: '100%',
+                         maxHeight: '100%',
+                         aspectRatio: '1 / 1',
                          display: 'block',
+                         margin: '0',
                          cursor: mapMode ? 'none' : 'default',
                          position: 'relative',
                          zIndex: 1
@@ -2074,7 +2080,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                  
                  {timerRender}
              </div>
-                 <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                 <div className={`dpads-sidebar ${showMobileControls ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                      
                      {/* DPAD & KEYPAD ROW */}
                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
@@ -2190,6 +2196,9 @@ const gunElevAlt = parseFloat(gunElevStr);
         </div>
 
         <div className="mfd-sidebar right">
+            <button className="osb-button mobile-controls-btn" onClick={() => setShowMobileControls(p => !p)} style={{ borderStyle: 'solid' }}>
+                CTRLS<br/>{showMobileControls ? 'HIDE' : 'SHOW'}
+            </button>
             {activePage === 'MAP' ? (
                 <>
                     {/* Top Group */}
@@ -2236,7 +2245,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                     {/* Bottom Group */}
                     
                     <button className="osb-button" onClick={() => setIsDelayOn(p => !p)} style={{ borderStyle: 'solid', background: isDelayOn ? 'var(--term-fg)' : 'transparent', color: isDelayOn ? 'var(--term-bg)' : 'var(--term-fg)' }}>
-                        F-DLY<br/>{isDelayOn ? 'ON' : 'OFF'}
+                        DELAY<br/>{isDelayOn ? 'ON' : 'OFF'}
                     </button>
                     {calculation.valid && fireStarts.length > 0 && !fireDelayEnd && (
                         <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={() => {
@@ -2307,7 +2316,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                     )}
                     <div style={{ flex: 1 }} />
                     <button className="osb-button" onClick={() => setIsDelayOn(p => !p)} style={{ borderStyle: 'solid', background: isDelayOn ? 'var(--term-fg)' : 'transparent', color: isDelayOn ? 'var(--term-bg)' : 'var(--term-fg)' }}>
-                        F-DLY<br/>{isDelayOn ? 'ON' : 'OFF'}
+                        DELAY<br/>{isDelayOn ? 'ON' : 'OFF'}
                     </button>
                     {calculation.valid && fireStarts.length > 0 && !fireDelayEnd && (
                         <button className="osb-button" style={{ borderStyle: 'dotted' }} onClick={() => {

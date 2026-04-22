@@ -391,68 +391,65 @@ button:active {
   font-size: 14px;
 }
 
-@media (orientation: landscape) {
-  .map-responsive-wrapper {
-    flex-direction: row;
-    height: 100%;
-    width: 100%;
-    position: relative;
-    display: flex;
-  }
-  .map-canvas-container {
-    height: 100%;
-    aspect-ratio: 1 / 1;
-    flex-shrink: 0;
-    align-self: flex-start;
-  }
-  .dpads-sidebar {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    flex: 1;
-    padding: 0 15px;
-    gap: 20px;
-  }
-  .sidebar-right-group {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    flex: 1;
-  }
+.map-responsive-wrapper {
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  display: flex;
+}
+.map-canvas-container {
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.dpads-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  padding: 0 15px;
+  gap: 20px;
+}
+.sidebar-right-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
 }
 
-@media (orientation: portrait) {
-  .map-responsive-wrapper {
-    flex-direction: column;
-    width: 100%;
-    display: flex;
-  }
+.mobile-controls-btn {
+  display: none !important;
+}
+
+@media (max-aspect-ratio: 1.5), (max-width: 1300px) {
   .map-canvas-container {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    height: 100%;
+    aspect-ratio: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
   }
   .dpads-sidebar {
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-top: 10px;
-    padding: 0 15px;
-    box-sizing: border-box;
+    position: absolute !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 320px;
+    background: transparent;
+    z-index: 100;
+    padding: 20px 15px;
+    overflow-y: auto;
+    flex-direction: column !important;
+    display: none !important;
   }
-  .sidebar-right-group {
-    display: flex;
-    flex-direction: row;
-    gap: 30px;
-    margin-left: auto;
-    max-width: 600px;
-    flex: 1;
-    justify-content: flex-end;
+  .dpads-sidebar.open {
+    display: flex !important;
   }
-  .term-inputs-wrapper {
-    min-width: 250px;
+  .mobile-controls-btn {
+    display: flex !important;
   }
 }
 
