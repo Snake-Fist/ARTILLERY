@@ -359,7 +359,7 @@ function App() {
   const [mapOriginY, setMapOriginY] = useState<number>(0);
   const [mapMode, setMapMode] = useState<'gun' | 'tgt' | null>(null);
 
-  const [showMobileMap, setShowMobileMap] = useState<boolean>(false);
+  const [showMobileControls, setShowMobileControls] = useState<boolean>(true);
 
   const [theme, setTheme] = useState<'AMBER' | 'GREEN' | 'RED' | 'WHITE'>('AMBER');
   const [zoomMode, setZoomMode] = useState<'OFF' | '2X' | '4X' | '8X' | 'FIT'>('OFF');
@@ -2034,7 +2034,7 @@ const gunElevAlt = parseFloat(gunElevStr);
       )}
 
       {(activePage === 'MAP' || activePage === 'SPOTTER') && (
-          <div className={`map-page map-responsive-wrapper ${showMobileMap ? 'show-mobile-map' : ''}`}>
+          <div className="map-page map-responsive-wrapper">
              <div className="map-canvas-container" style={{ position: 'relative' }}>
                  <canvas 
                      ref={canvasRef} 
@@ -2080,7 +2080,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                  
                  {timerRender}
              </div>
-                 <div className="dpads-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                 <div className={`dpads-sidebar ${showMobileControls ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                      
                      {/* DPAD & KEYPAD ROW */}
                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
@@ -2157,7 +2157,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                                  const t = spotterTargets[i] || {x:'', y:'', alt:''};
                                  const isCurrentlyTargeted = t.x !== '' && t.y !== '' && tgtX === t.x && tgtY === t.y;
                                  return (
-                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: i < 9 ? '12px' : '0' }}>
+                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: i < 9 ? '4px' : '0' }}>
                                          <div style={{ width: '24px', color: 'var(--term-fg)', fontSize: '11px', textAlign: 'left', fontWeight: 'bold' }}>
                                              <span style={{ display: 'inline-block', width: '10px' }}>{isCurrentlyTargeted ? '>' : '\u00A0'}</span>T{i}
                                          </div>
@@ -2196,8 +2196,8 @@ const gunElevAlt = parseFloat(gunElevStr);
         </div>
 
         <div className="mfd-sidebar right">
-            <button className="osb-button mobile-map-btn" onClick={() => setShowMobileMap(p => !p)} style={{ borderStyle: 'solid' }}>
-                MAP<br/>{showMobileMap ? 'HIDE' : 'SHOW'}
+            <button className="osb-button mobile-controls-btn" onClick={() => setShowMobileControls(p => !p)} style={{ borderStyle: 'solid' }}>
+                CTRLS<br/>{showMobileControls ? 'HIDE' : 'SHOW'}
             </button>
             {activePage === 'MAP' ? (
                 <>
