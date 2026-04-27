@@ -325,7 +325,7 @@ button:active {
   flex: 1;
   min-height: 0;
   min-width: 0;
-  gap: 20px;
+  gap: 12px;
 }
 
 .map-canvas-container {
@@ -409,7 +409,7 @@ button:active {
   flex-direction: column;
   height: 100%;
   flex: 1;
-  padding: 0 15px;
+  padding: 0;
   gap: 20px;
 }
 .sidebar-right-group {

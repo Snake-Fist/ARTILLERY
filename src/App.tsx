@@ -275,7 +275,19 @@ const RepeatButton = ({ onClick, children, style, className }: any) => {
   );
 };
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(window.matchMedia(query).matches);
+  useEffect(() => {
+    const mediaQueryList = window.matchMedia(query);
+    const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mediaQueryList.addEventListener('change', listener);
+    return () => mediaQueryList.removeEventListener('change', listener);
+  }, [query]);
+  return matches;
+}
+
 function App() {
+  const isRemoteMode = useMediaQuery('(max-width: 768px)');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
   const soundEnabledRef = useRef(soundEnabled);
   useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
@@ -1072,11 +1084,28 @@ const gunElevAlt = parseFloat(gunElevStr);
 
   const chargeStr = (calculation.valid && calculation.charge !== undefined) ? calculation.charge : '-';
 
-  useEffect(() => {
+
+  const gestureStateRef = useRef({ active: false, size: 0, x: 0, y: 0, lastTouches: [] as {x: number, y: number}[] });
+  const drawMapRef = useRef<() => void>(() => {});
+  const flushGestureStateRef = useRef<() => void>(() => {});
+
+  flushGestureStateRef.current = () => {
+      setZoomMode('OFF');
+      setBaseMapSize(Number(gestureStateRef.current.size.toFixed(2)));
+      setMapOriginX(Math.round(gestureStateRef.current.x));
+      setMapOriginY(Math.round(gestureStateRef.current.y));
+  };
+
+  drawMapRef.current = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+
+      const activeMapSize = gestureStateRef.current.active ? gestureStateRef.current.size : mapSize;
+      const activeMapOriginX = gestureStateRef.current.active ? gestureStateRef.current.x : mapOriginX;
+      const activeMapOriginY = gestureStateRef.current.active ? gestureStateRef.current.y : mapOriginY;
+
 
       let mapFg = '#ffb000';
       if (theme === 'GREEN') mapFg = '#33ff33';
@@ -1086,7 +1115,7 @@ const gunElevAlt = parseFloat(gunElevStr);
       const mapFg40 = mapFg + '40';
       const mapFg80 = mapFg + '80';
 
-      const mapMeters = mapSize * 1000;
+      const mapMeters = activeMapSize * 1000;
       
       // Clear
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1096,16 +1125,16 @@ const gunElevAlt = parseFloat(gunElevStr);
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]); 
       ctx.beginPath();
-      const start100X = Math.floor(mapOriginX / 100) * 100;
-      const start100Y = Math.floor(mapOriginY / 100) * 100;
-      for (let x = start100X; x <= mapOriginX + mapMeters; x += 100) {
+      const start100X = Math.floor(activeMapOriginX / 100) * 100;
+      const start100Y = Math.floor(activeMapOriginY / 100) * 100;
+      for (let x = start100X; x <= activeMapOriginX + mapMeters; x += 100) {
           if (x % 1000 === 0) continue;
-          const px = Math.floor(((x - mapOriginX) / mapMeters) * canvas.width) + 0.5;
+          const px = Math.floor(((x - activeMapOriginX) / mapMeters) * canvas.width) + 0.5;
           ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
       }
-      for (let y = start100Y; y <= mapOriginY + mapMeters; y += 100) {
+      for (let y = start100Y; y <= activeMapOriginY + mapMeters; y += 100) {
           if (y % 1000 === 0) continue;
-          const py = Math.floor(canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height) + 0.5;
+          const py = Math.floor(canvas.height - ((y - activeMapOriginY) / mapMeters) * canvas.height) + 0.5;
           ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
       }
       ctx.stroke();
@@ -1115,14 +1144,14 @@ const gunElevAlt = parseFloat(gunElevStr);
       ctx.lineWidth = 1.0;
       ctx.setLineDash([]);
       ctx.beginPath();
-      const start1000X = Math.floor(mapOriginX / 1000) * 1000;
-      const start1000Y = Math.floor(mapOriginY / 1000) * 1000;
-      for (let x = start1000X; x <= mapOriginX + mapMeters; x += 1000) {
-          const px = Math.floor(((x - mapOriginX) / mapMeters) * canvas.width) + 0.5;
+      const start1000X = Math.floor(activeMapOriginX / 1000) * 1000;
+      const start1000Y = Math.floor(activeMapOriginY / 1000) * 1000;
+      for (let x = start1000X; x <= activeMapOriginX + mapMeters; x += 1000) {
+          const px = Math.floor(((x - activeMapOriginX) / mapMeters) * canvas.width) + 0.5;
           ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height);
       }
-      for (let y = start1000Y; y <= mapOriginY + mapMeters; y += 1000) {
-          const py = Math.floor(canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height) + 0.5;
+      for (let y = start1000Y; y <= activeMapOriginY + mapMeters; y += 1000) {
+          const py = Math.floor(canvas.height - ((y - activeMapOriginY) / mapMeters) * canvas.height) + 0.5;
           ctx.moveTo(0, py); ctx.lineTo(canvas.width, py);
       }
       ctx.stroke();
@@ -1131,19 +1160,19 @@ const gunElevAlt = parseFloat(gunElevStr);
       // Labels
       ctx.fillStyle = mapFg;
       ctx.font = '10px monospace';
-      for (let x = start1000X; x <= mapOriginX + mapMeters; x += 1000) {
-          const px = ((x - mapOriginX) / mapMeters) * canvas.width;
+      for (let x = start1000X; x <= activeMapOriginX + mapMeters; x += 1000) {
+          const px = ((x - activeMapOriginX) / mapMeters) * canvas.width;
           if (x >= 0) ctx.fillText((Math.floor(x/1000) % 100).toString().padStart(2,'0'), px + 2, canvas.height - 2);
       }
-      for (let y = start1000Y; y <= mapOriginY + mapMeters; y += 1000) {
-          const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
+      for (let y = start1000Y; y <= activeMapOriginY + mapMeters; y += 1000) {
+          const py = canvas.height - ((y - activeMapOriginY) / mapMeters) * canvas.height;
           if (y >= 0 && py < canvas.height - 10) ctx.fillText((Math.floor(y/1000) % 100).toString().padStart(2,'0'), 2, py - 2);
       }
 
       const drawPoint = (x: number | null, y: number | null, label: string, alt?: string) => {
           if (x === null || y === null) return null;
-          const px = ((x - mapOriginX) / mapMeters) * canvas.width;
-          const py = canvas.height - ((y - mapOriginY) / mapMeters) * canvas.height;
+          const px = ((x - activeMapOriginX) / mapMeters) * canvas.width;
+          const py = canvas.height - ((y - activeMapOriginY) / mapMeters) * canvas.height;
           
           ctx.strokeStyle = mapFg;
           ctx.lineWidth = 1;
@@ -1247,8 +1276,8 @@ const gunElevAlt = parseFloat(gunElevStr);
           if (st && st.x !== '' && st.y !== '') {
               const sx = parseInt(st.x);
               const sy = parseInt(st.y);
-              const px = Math.floor(((sx - mapOriginX) / mapMeters) * canvas.width) + 0.5;
-              const py = Math.floor(canvas.height - ((sy - mapOriginY) / mapMeters) * canvas.height) + 0.5;
+              const px = Math.floor(((sx - activeMapOriginX) / mapMeters) * canvas.width) + 0.5;
+              const py = Math.floor(canvas.height - ((sy - activeMapOriginY) / mapMeters) * canvas.height) + 0.5;
               
               if (px >= 0 && px <= canvas.width && py >= 0 && py <= canvas.height) {
                   const isLocked = st.x.padStart(4, '0') === tgtX.padStart(4, '0') && st.y.padStart(4, '0') === tgtY.padStart(4, '0');
@@ -1327,8 +1356,8 @@ const gunElevAlt = parseFloat(gunElevStr);
               const progress = elapsed / fs.tof;
               const isHit = progress >= 1;
               
-              const tOrigPx = ((fs.tx - mapOriginX) / mapMeters) * canvas.width;
-              const tOrigPy = canvas.height - ((fs.ty - mapOriginY) / mapMeters) * canvas.height;
+              const tOrigPx = ((fs.tx - activeMapOriginX) / mapMeters) * canvas.width;
+              const tOrigPy = canvas.height - ((fs.ty - activeMapOriginY) / mapMeters) * canvas.height;
               
               if (isHit) {
                   const blinkOn = Math.floor(Date.now() / 150) % 2 === 0;
@@ -1363,7 +1392,108 @@ const gunElevAlt = parseFloat(gunElevStr);
               }
           });
       }
-  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY, theme, spotterTargets]);
+
+  };
+
+  useEffect(() => {
+      if (!gestureStateRef.current.active) {
+          drawMapRef.current();
+      }
+  }, [activePage, mapSize, gunX, gunY, tgtX, tgtY, adjN, adjS, adjE, adjW, calculation, now, fireStarts, mapOriginX, mapOriginY, theme, spotterTargets, isRemoteMode]);
+
+  useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const handleTouchStart = (e: TouchEvent) => {
+          if (e.touches.length > 0) {
+              if (!gestureStateRef.current.active) {
+                  gestureStateRef.current.active = true;
+                  gestureStateRef.current.size = mapSize;
+                  gestureStateRef.current.x = mapOriginX;
+                  gestureStateRef.current.y = mapOriginY;
+              }
+              gestureStateRef.current.lastTouches = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+          }
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+          if (!gestureStateRef.current.active) return;
+          e.preventDefault(); // Prevent scrolling/zooming whole page
+
+          const touches = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+          const lastTouches = gestureStateRef.current.lastTouches;
+
+          if (touches.length === 1 && lastTouches.length === 1) {
+              const dx = touches[0].x - lastTouches[0].x;
+              const dy = touches[0].y - lastTouches[0].y;
+
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+
+              const mapMeters = gestureStateRef.current.size * 1000;
+              const dMapX = -(dx * scaleX / canvas.width) * mapMeters;
+              const dMapY = (dy * scaleY / canvas.height) * mapMeters;
+
+              gestureStateRef.current.x = Math.max(0, gestureStateRef.current.x + dMapX);
+              gestureStateRef.current.y = Math.max(0, gestureStateRef.current.y + dMapY);
+
+          } else if (touches.length === 2 && lastTouches.length === 2) {
+              const dist = (p1: any, p2: any) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+              const d1 = dist(lastTouches[0], lastTouches[1]);
+              const d2 = dist(touches[0], touches[1]);
+
+              if (d1 > 0 && d2 > 0) {
+                  const scale = d1 / d2;
+                  let newSize = gestureStateRef.current.size * scale;
+                  newSize = Math.max(1, Math.min(99, newSize));
+                  
+                  const cx = (touches[0].x + touches[1].x) / 2;
+                  const cy = (touches[0].y + touches[1].y) / 2;
+
+                  const rect = canvas.getBoundingClientRect();
+                  const cxCanvas = (cx - rect.left) * (canvas.width / rect.width);
+                  const cyCanvas = (cy - rect.top) * (canvas.height / rect.height);
+
+                  const mapMeters = gestureStateRef.current.size * 1000;
+                  const newMapMeters = newSize * 1000;
+
+                  const worldX = gestureStateRef.current.x + (cxCanvas / canvas.width) * mapMeters;
+                  const worldY = gestureStateRef.current.y + ((canvas.height - cyCanvas) / canvas.height) * mapMeters;
+
+                  gestureStateRef.current.size = newSize;
+                  gestureStateRef.current.x = Math.max(0, worldX - (cxCanvas / canvas.width) * newMapMeters);
+                  gestureStateRef.current.y = Math.max(0, worldY - ((canvas.height - cyCanvas) / canvas.height) * newMapMeters);
+              }
+          }
+
+          gestureStateRef.current.lastTouches = touches;
+          requestAnimationFrame(() => drawMapRef.current());
+      };
+
+      const handleTouchEnd = (e: TouchEvent) => {
+          if (e.touches.length === 0 && gestureStateRef.current.active) {
+              gestureStateRef.current.active = false;
+              flushGestureStateRef.current();
+          } else if (e.touches.length > 0) {
+              gestureStateRef.current.lastTouches = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+          }
+      };
+
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+      canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+      return () => {
+          canvas.removeEventListener('touchstart', handleTouchStart);
+          canvas.removeEventListener('touchmove', handleTouchMove);
+          canvas.removeEventListener('touchend', handleTouchEnd);
+          canvas.removeEventListener('touchcancel', handleTouchEnd);
+      };
+  }, [mapSize, mapOriginX, mapOriginY]);
+
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!mapMode) return;
@@ -1715,6 +1845,262 @@ const gunElevAlt = parseFloat(gunElevStr);
   const adjEW = adjE ? `E ${adjE}` : (adjW ? `W ${adjW}` : '');
   let adjStr = `${adjNS}  ${adjEW}`.trim();
   if (!adjStr) adjStr = '-- M';
+
+  if (isRemoteMode) {
+      return (
+          <div className="mfd-outer handheld-terminal" style={{ padding: '10px', gap: '10px' }}>
+              <header className="terminal-header" style={{ borderBottom: '1px solid var(--term-border)', paddingBottom: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h1 style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0, fontSize: '18px' }}>M777 HANDHELD</h1>
+                  <div style={{ fontSize: '10px', textAlign: 'right', opacity: peerStatus === 'OFFLINE' ? 0.5 : 1, color: 'var(--term-fg)' }}>
+                      {peerStatus === 'WAITING' ? <span>LINKING<span className="loading-dots"></span></span> : peerStatus}
+                      {connCount > 0 && <div>NET: {connCount + 1}</div>}
+                  </div>
+              </header>
+
+              {/* TABS */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
+                  <button className={`osb-button ${activePage === 'MAP' || activePage === 'COORDS' || activePage === 'SETTINGS' ? 'active' : ''}`} style={{ flex: 1, fontSize: '14px', padding: '8px' }} onClick={() => setActivePage('MAP')}>FDC</button>
+                  <button className={`osb-button ${activePage === 'SPOTTER' ? 'active' : ''}`} style={{ flex: 1, fontSize: '14px', padding: '8px' }} onClick={() => setActivePage('SPOTTER')}>SPOT</button>
+                  <button className={`osb-button ${activePage === 'GUNNER' ? 'active' : ''}`} style={{ flex: 1, fontSize: '14px', padding: '8px' }} onClick={() => setActivePage('GUNNER')}>GUN</button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', gap: '15px' }}>
+                  
+                  {/* FDC Page */}
+                  {(activePage === 'MAP' || activePage === 'COORDS' || activePage === 'SETTINGS') && (
+                      <>
+                          {/* BDT Output */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '18px', lineHeight: '1.4', color: 'var(--term-fg)', borderBottom: '1px dashed var(--term-border)', paddingBottom: '10px' }}>
+                              <div style={{ minHeight: '22px' }}>
+                                  {!calculation.valid && calculation.message !== 'WAITING FOR DATA...' && (
+                                      <div style={{ color: 'var(--term-fg)', marginBottom: '8px', fontSize: '12px' }}>{calculation.message}</div>
+                                  )}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>CHG</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{chargeStr}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>AZ</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{azDegStr}° / {azMilStr}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>EL</span><span style={{ backgroundColor: 'var(--term-fg)', color: 'var(--term-bg)', padding: '0 4px', fontWeight: 'bold' }}>{elDegStr}° / {elMilStr}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>TOF</span><span>{tofStr}s</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>RNG</span><span>{gridData ? gridData.range : '----'} M</span></div>
+                          </div>
+
+                          {/* Inputs */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                               <TerminalField id="linkCode" label="LINK" val={linkCode.padEnd(4, '—')} />
+                               <div style={{ height: '4px' }} />
+                               <TerminalField id="gunX" label="GUN X" val={gunX} />
+                               <TerminalField id="gunY" label="GUN Y" val={gunY} />
+                               <div style={{ height: '4px' }} />
+                               <TerminalField id="tgtX" label="TGT X" val={tgtX} />
+                               <TerminalField id="tgtY" label="TGT Y" val={tgtY} />
+                               <div style={{ height: '4px' }} />
+                               <TerminalField id="windSpeed" label="WND SPD" val={windSpeed} />
+                               <TerminalField id="windDir" label="WND DIR" val={windDir} />
+                               <div style={{ height: '4px' }} />
+                               <TerminalField id="charge" label="CHARGE" val={forcedChargeStr === '' ? 'AUTO' : forcedChargeStr} />
+                          </div>
+                      </>
+                  )}
+
+                  {/* SPOTTER Page */}
+                  {activePage === 'SPOTTER' && (
+                      <div className="spotter-scroll-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                              <div style={{ width: '24px' }}></div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--term-fg)', fontWeight: 'bold' }}>
+                                  <div>X</div>
+                                  <div>Y</div>
+                                  <div>EL</div>
+                              </div>
+                          </div>
+                          {[1,2,3,4,5,6,7,8,9].map(i => {
+                              const t = spotterTargets[i] || {x:'', y:'', alt:''};
+                              const isCurrentlyTargeted = t.x !== '' && t.y !== '' && tgtX === t.x && tgtY === t.y;
+                              return (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', border: isCurrentlyTargeted ? '1px dashed var(--term-border)' : '1px solid transparent', padding: '2px' }}>
+                                      <div style={{ width: '24px', color: 'var(--term-fg)', fontSize: '11px', textAlign: 'left', fontWeight: 'bold' }}>
+                                          <span style={{ display: 'inline-block', width: '10px' }}>{isCurrentlyTargeted ? '>' : '\u00A0'}</span>T{i}
+                                      </div>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', flex: 1 }}>
+                                          <TerminalField id={`spot${i}X`} label="" val={t.x} hideLabel />
+                                          <TerminalField id={`spot${i}Y`} label="" val={t.y} hideLabel />
+                                          <TerminalField id={`spot${i}Alt`} label="" val={t.alt} hideLabel />
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
+
+                  {/* GUNNER Page */}
+                  {activePage === 'GUNNER' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {!calculation.valid ? (
+                              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '20px', minHeight: '300px' }}>
+                                  <div style={{ fontSize: '24px', animation: 'blinker 1s linear infinite' }}>WAITING FOR DATA</div>
+                                  <div style={{ fontSize: '14px', opacity: 0.7 }}>{calculation.message || 'NO SOLUTION'}</div>
+                              </div>
+                          ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', marginTop: '10px' }}>
+                                  {/* Periscope Visual */}
+                                  <div style={{ transform: 'scale(0.85)', transformOrigin: 'top center', marginBottom: '-40px' }}>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '120px 250px', gridTemplateRows: '250px 120px', gap: '20px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: '48px', fontWeight: 'bold' }}>
+                                              <div style={{ textAlign: 'right' }}>
+                                                  <div style={{ fontSize: '16px', opacity: 0.7, marginBottom: '8px' }}>ELEV (Y)</div>
+                                                  <div>{elMilStr}</div>
+                                              </div>
+                                          </div>
+                                          <div style={{ position: 'relative', width: '250px', height: '250px', border: '4px solid var(--term-fg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                              <div style={{ position: 'absolute', width: '100%', height: '2px', background: 'var(--term-fg)', opacity: 0.4 }} />
+                                              <div style={{ position: 'absolute', width: '2px', height: '100%', background: 'var(--term-fg)', opacity: 0.4 }} />
+                                              <div style={{ width: '40px', height: '40px', border: '2px solid var(--term-fg)', borderRadius: '50%', opacity: 0.8 }} />
+                                          </div>
+                                          <div />
+                                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', fontSize: '48px', fontWeight: 'bold' }}>
+                                              <div style={{ textAlign: 'center' }}>
+                                                  <div style={{ fontSize: '16px', opacity: 0.7, marginBottom: '8px' }}>DEFL (X)</div>
+                                                  <div>{azMilStr}</div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Loadout Visual */}
+                                  <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-end', transform: 'scale(0.9)', transformOrigin: 'top center' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                                          <svg viewBox="0 0 64 184" width="78" height="224" stroke="currentColor" fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" style={{ overflow: 'visible' }}>
+                                              <path d="M 29 4 L 35 4 L 38 20 Q 49 42 52 92 L 52 152 L 52 157 L 47 182 L 17 182 L 12 157 L 12 152 L 12 92 Q 15 42 26 20 L 29 4 Z" />
+                                              <line x1="12" y1="152" x2="52" y2="152" />
+                                              <line x1="12" y1="157" x2="52" y2="157" />
+                                              <line x1="26" y1="20" x2="38" y2="20" />
+                                              <circle cx="32" cy="14" r="1.5" stroke="none" fill="currentColor" />
+                                              <rect x="23" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                              <rect x="30" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                              <rect x="37" y="65" width="4" height="4" fill="currentColor" stroke="none" />
+                                              <text x="32" y="115" textAnchor="middle" fill="currentColor" stroke="none" fontSize="14" fontWeight="bold" letterSpacing="1">TNT</text>
+                                              <text x="32" y="135" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontWeight="bold">155 MM</text>
+                                          </svg>
+                                          <div style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center' }}>M107<br/>HE</div>
+                                      </div>
+
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '6px' }}>
+                                              {[1, 2, 3, 4, 5].map(c => {
+                                                  const activeChg = parseInt(String(chargeStr)) || 0;
+                                                  const isActive = activeChg >= c;
+                                                  return (
+                                                      <div key={c} style={{ width: '80px', height: '40px', border: '4px solid var(--term-fg)', background: isActive ? 'var(--term-fg)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? 'var(--term-bg)' : 'var(--term-fg)', fontWeight: 'bold', fontSize: '24px' }}>
+                                                          {c}
+                                                      </div>
+                                                  );
+                                              })}
+                                          </div>
+                                          <div style={{ fontSize: '20px', fontWeight: 'bold', textAlign: 'center' }}>CHG<br/>{chargeStr}</div>
+                                      </div>
+                                  </div>
+
+                                  {/* TOF Bar */}
+                                  {fireStarts.length > 0 && (
+                                      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold' }}>
+                                              <span>TIME OF FLIGHT</span>
+                                              <span>
+                                                  {Math.min(fireStarts[fireStarts.length - 1].tof, (now - fireStarts[fireStarts.length - 1].start) / 1000).toFixed(1)}s / {fireStarts[fireStarts.length - 1].tof.toFixed(1)}s
+                                              </span>
+                                          </div>
+                                          <div style={{ width: '100%', height: '24px', border: '2px solid var(--term-fg)', position: 'relative' }}>
+                                              <div style={{ 
+                                                  height: '100%', 
+                                                  background: 'var(--term-fg)', 
+                                                  width: `${Math.min(100, ((now - fireStarts[fireStarts.length - 1].start) / 1000) / fireStarts[fireStarts.length - 1].tof * 100)}%`,
+                                                  transition: 'width 0.1s linear'
+                                              }} />
+                                              {((now - fireStarts[fireStarts.length - 1].start) / 1000) >= fireStarts[fireStarts.length - 1].tof && (
+                                                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--term-bg)', fontWeight: 'bold', animation: 'blinker 0.2s linear infinite' }}>
+                                                      SPLASH
+                                                  </div>
+                                              )}
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+                  )}
+
+              </div>
+
+              {activePage !== 'GUNNER' && timerRender}
+
+              {/* Controls */}
+              <div className="handheld-controls" style={{ marginTop: 'auto', paddingTop: '10px' }}>
+                  {activePage !== 'GUNNER' && (
+                      <div className="dpad-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(4, 60px)', gap: '8px' }}>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('7')}>7</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('8')}>8</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('9')}>9</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('4')}>4</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('5')}>5</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('6')}>6</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('1')}>1</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('2')}>2</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('3')}>3</RepeatButton>
+                           <RepeatButton className="dpad-btn dpad-btn-reset" style={{borderStyle: 'solid', fontSize: '18px'}} onClick={() => handleKeypadPress('DEL')}>DEL</RepeatButton>
+                           <RepeatButton className="dpad-btn" style={{fontSize: '24px'}} onClick={() => handleKeypadPress('0')}>0</RepeatButton>
+                           <div style={{ display: 'flex', gap: '4px' }}>
+                               <button className="dpad-btn" style={{ flex: 1, borderStyle: 'solid', fontSize: '20px' }} onClick={() => handleKeypadPress('PREV')}>▲</button>
+                               <button className="dpad-btn" style={{ flex: 1, borderStyle: 'solid', fontSize: '20px' }} onClick={() => handleKeypadPress('NEXT')}>▼</button>
+                           </div>
+                      </div>
+                  )}
+
+                  {/* Fire Button Row */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', height: '60px' }}>
+                       {activePage !== 'GUNNER' && (
+                           <button className="osb-button" style={{ flex: 1, fontSize: '16px', borderStyle: 'solid' }} onClick={() => handleKeypadPress('CLR')}>CLR</button>
+                       )}
+                       <button className="osb-button" style={{ flex: 1, fontSize: '16px', borderStyle: 'solid', background: isDelayOn ? 'var(--term-fg)' : 'transparent', color: isDelayOn ? 'var(--term-bg)' : 'var(--term-fg)' }} onClick={() => setIsDelayOn(p => !p)}>DLY</button>
+                       
+                       {fireDelayEnd ? (
+                           <button 
+                               className="osb-button" 
+                               onClick={(e) => { e.stopPropagation(); setFireDelayEnd(null); }}
+                               style={{ flex: activePage === 'GUNNER' ? 3 : 2, fontSize: '24px', borderStyle: 'solid', animation: 'blinker 0.5s linear infinite', color: 'var(--term-bg)', background: 'var(--term-fg)' }}
+                           >
+                               FIRE<br/>{Math.ceil((fireDelayEnd - now) / 1000)}
+                           </button>
+                       ) : fireStarts.length > 0 ? (
+                           <button 
+                               className="osb-button btn-cancel-fire" 
+                               onClick={(e) => { e.stopPropagation(); handleCancelFire(); }}
+                               style={{ flex: activePage === 'GUNNER' ? 3 : 2, fontSize: '24px', borderStyle: 'solid' }}
+                           >
+                               <span style={{ animation: 'blinker 1s linear infinite' }}>FIRE</span>
+                           </button>
+                       ) : (
+                           <button 
+                               className="osb-button" 
+                               onClick={calculation.valid ? () => {
+                                   if (isDelayOn) { setFireDelayEnd(Date.now() + 5000); setNow(Date.now()); } else handleFire();
+                               } : undefined} disabled={!calculation.valid}
+                               style={{
+                                   flex: activePage === 'GUNNER' ? 3 : 2, fontSize: '24px',
+                                   borderStyle: 'solid',
+                                   cursor: calculation.valid ? 'pointer' : 'not-allowed',
+                                   opacity: calculation.valid ? 1 : 0.6,
+                                   background: calculation.valid 
+                                       ? 'var(--term-bg)' 
+                                       : 'linear-gradient(to top left, transparent 48%, var(--term-fg) 49%, var(--term-fg) 51%, transparent 52%)'
+                               }}
+                           >
+                               FIRE
+                           </button>
+                       )}
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="mfd-outer">
@@ -2080,7 +2466,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                  
                  {timerRender}
              </div>
-                 <div className={`dpads-sidebar ${showMobileControls ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                 <div className={`dpads-sidebar ${showMobileControls ? 'open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                      
                      {/* DPAD & KEYPAD ROW */}
                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
@@ -2126,7 +2512,7 @@ const gunElevAlt = parseFloat(gunElevStr);
 
                      <div className="sidebar-right-group">
                      {/* TERMINAL INPUTS */}
-                         <div className={`term-inputs-wrapper ${activePage === 'SPOTTER' ? 'spotter-scroll-container' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '12px' }}>
+                         <div className={`term-inputs-wrapper ${activePage === 'SPOTTER' ? 'spotter-scroll-container' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px dashed var(--term-border)', paddingBottom: '8px' }}>
                              {activePage === 'MAP' && (
                                  <>
                                      <TerminalField id="gunX" label="GUN X" val={gunX} />
@@ -2157,7 +2543,7 @@ const gunElevAlt = parseFloat(gunElevStr);
                                  const t = spotterTargets[i] || {x:'', y:'', alt:''};
                                  const isCurrentlyTargeted = t.x !== '' && t.y !== '' && tgtX === t.x && tgtY === t.y;
                                  return (
-                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: i < 9 ? '4px' : '0' }}>
+                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: i < 9 ? '4px' : '0', border: isCurrentlyTargeted ? '1px dashed var(--term-border)' : '1px solid transparent', padding: '2px' }}>
                                          <div style={{ width: '24px', color: 'var(--term-fg)', fontSize: '11px', textAlign: 'left', fontWeight: 'bold' }}>
                                              <span style={{ display: 'inline-block', width: '10px' }}>{isCurrentlyTargeted ? '>' : '\u00A0'}</span>T{i}
                                          </div>
